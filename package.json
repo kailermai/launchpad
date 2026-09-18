@@ -1,8 +1,8 @@
 {
-  "name": "personal-launcher",
-  "productName": "PersonalLauncher",
+  "name": "launchpad",
+  "productName": "Launchpad",
   "version": "0.1.0",
-  "description": "A safe, local-first personal launcher for the games and apps you choose to add.",
+  "description": "Launchpad: a safe, local-first shelf for the games and apps you choose to add.",
   "main": "./out/main/index.js",
   "private": true,
   "author": "Kai Ler",

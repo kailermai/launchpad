@@ -25,13 +25,14 @@ export const initialRoute = (): string | null => {
 }
 
 export function scheduleScreenshot(win: BrowserWindow, file: string): void {
+  const delay = Number(argValue('screenshot-delay')) || 1500
   win.webContents.once('did-finish-load', () => {
     setTimeout(async () => {
       console.log(`[screenshot] ${win.webContents.getURL()} argv=${JSON.stringify(process.argv.slice(1))}`)
       const image = await win.webContents.capturePage()
       fs.writeFileSync(file, image.toPNG())
       app.exit(0)
-    }, 1500)
+    }, delay)
   })
 }
 

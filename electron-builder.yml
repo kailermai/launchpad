@@ -1,5 +1,5 @@
 appId: com.kailer.personallauncher
-productName: PersonalLauncher
+productName: Launchpad
 directories:
   output: release
   buildResources: build
@@ -18,6 +18,6 @@ nsis:
   perMachine: false
   allowElevation: false
   deleteAppDataOnUninstall: false
-  shortcutName: Personal Launcher
+  shortcutName: Launchpad
 portable:
-  artifactName: PersonalLauncher-portable-${version}.exe
+  artifactName: Launchpad-portable-${version}.exe

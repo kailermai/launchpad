@@ -33,7 +33,7 @@ export function TopBar(): JSX.Element {
         <span className="mark">
           <IconRocket size={13} />
         </span>
-        Personal Launcher
+        Launchpad
       </div>
 
       <div className="titlebar-search">

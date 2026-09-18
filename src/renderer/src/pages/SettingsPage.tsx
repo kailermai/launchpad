@@ -77,7 +77,7 @@ function GeneralSettings(): JSX.Element {
   return (
     <>
       <h2>General</h2>
-      <p className="lead">Personal Launcher {info?.version ?? ''} — a shelf for everything you choose to launch.</p>
+      <p className="lead">Launchpad {info?.version ?? ''} — a shelf for everything you choose to launch.</p>
 
       <div className="callout" style={{ marginBottom: 20 }}>
         <div>

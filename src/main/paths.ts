@@ -4,10 +4,12 @@ import path from 'node:path'
 
 /**
  * Everything the launcher ever writes lives under this one folder:
- *   %APPDATA%\PersonalLauncher\
+ *   %APPDATA%\Launchpad\
  * (Safety Rule 4). No other location is ever written to.
  */
-export const APP_FOLDER_NAME = 'PersonalLauncher'
+export const APP_FOLDER_NAME = 'Launchpad'
+/** Folder name used by builds before the rename; moved to APP_FOLDER_NAME on first start. */
+export const LEGACY_FOLDER_NAME = 'PersonalLauncher'
 
 export interface Paths {
   dataDir: string
@@ -18,10 +20,29 @@ export interface Paths {
 
 let cached: Paths | null = null
 
+/**
+ * Picks the data folder inside appData. If only the legacy folder exists it is
+ * renamed in place (same drive, atomic); if that fails — e.g. an old instance
+ * still has it open — the legacy folder keeps being used. Nothing is copied
+ * or deleted.
+ */
+export function resolveDataDir(appData: string): string {
+  const target = path.join(appData, APP_FOLDER_NAME)
+  const legacy = path.join(appData, LEGACY_FOLDER_NAME)
+  if (!fs.existsSync(target) && fs.existsSync(legacy)) {
+    try {
+      fs.renameSync(legacy, target)
+    } catch {
+      return legacy
+    }
+  }
+  return target
+}
+
 /** Must run before app 'ready' so Electron itself also uses the folder. */
 export function configureUserData(): void {
   app.setName(APP_FOLDER_NAME)
-  app.setPath('userData', path.join(app.getPath('appData'), APP_FOLDER_NAME))
+  app.setPath('userData', resolveDataDir(app.getPath('appData')))
 }
 
 export function getPaths(): Paths {

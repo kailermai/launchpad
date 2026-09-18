@@ -427,9 +427,136 @@
 
 .picker {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 420px;
   gap: 28px;
   align-items: start;
+}
+.picker-mode {
+  display: flex;
+  justify-content: center;
+}
+.picker-mode .segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* slot machine */
+.slot {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.slot-reel {
+  position: relative;
+  height: calc(72px * 3);
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 14px 22px rgba(0, 0, 0, 0.55), inset 0 -14px 22px rgba(0, 0, 0, 0.55);
+}
+.slot-strip {
+  will-change: transform;
+}
+.slot-item {
+  height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+.slot-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.slot-window {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 72px;
+  height: 72px;
+  border-top: 2px solid var(--accent-strong);
+  border-bottom: 2px solid var(--accent-strong);
+  box-shadow: 0 0 18px var(--accent-glow);
+  pointer-events: none;
+}
+
+/* roulette wheel */
+.wheel-wrap {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  margin: 6px auto 18px;
+}
+.wheel {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 6px solid var(--bg-card);
+  box-shadow: 0 0 0 2px var(--border-strong), var(--shadow-lg), inset 0 0 40px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden; /* rotated labels must not add scrollable overflow */
+  will-change: transform;
+}
+.wheel-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12px;
+  pointer-events: none;
+}
+.wheel-label span {
+  writing-mode: vertical-rl;
+  max-height: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.02em;
+}
+.wheel-pointer {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-top: 24px solid var(--play);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+  z-index: 3;
+}
+.wheel-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--bg-elev);
+  border: 3px solid var(--border-strong);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-strong);
+  font-size: 22px;
+  z-index: 2;
 }
 .candidates {
   display: flex;

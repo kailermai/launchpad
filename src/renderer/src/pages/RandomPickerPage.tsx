@@ -5,14 +5,35 @@ import { api } from '@/api'
 import { CoverImage, Thumb } from '@/components/CoverImage'
 import { EmptyState } from '@/components/EmptyState'
 import { IconDice, IconPlay, IconRefresh } from '@/components/Icons'
+import { QuickShuffle } from '@/components/picker/QuickShuffle'
+import { RouletteWheel } from '@/components/picker/RouletteWheel'
+import { SlotMachine } from '@/components/picker/SlotMachine'
 import { useAppearance } from '@/store/AppearanceContext'
 import { useLibrary } from '@/store/LibraryContext'
+import { randomIndex } from '@/utils/random'
 
-/** Cryptographically random index — no bias, no "it always picks the same one". */
-function randomIndex(n: number): number {
-  const buf = new Uint32Array(1)
-  crypto.getRandomValues(buf)
-  return buf[0] % n
+type PickerMode = 'quick' | 'slots' | 'wheel'
+const MODES: { id: PickerMode; label: string; hint: string }[] = [
+  { id: 'quick', label: 'Quick', hint: 'Fast shuffle, about a second' },
+  { id: 'slots', label: 'Slots', hint: 'Three reels, stop one by one' },
+  { id: 'wheel', label: 'Wheel', hint: 'Spin the wheel, wait for the pointer' }
+]
+const MODE_KEY = 'launcher.pickerMode'
+
+function loadMode(): PickerMode {
+  try {
+    const v = localStorage.getItem(MODE_KEY)
+    if (v === 'quick' || v === 'slots' || v === 'wheel') return v
+  } catch {
+    // ignore
+  }
+  return 'quick'
+}
+
+interface Spin {
+  key: number
+  pool: Application[]
+  winner: Application
 }
 
 export function RandomPickerPage(): JSX.Element {
@@ -23,10 +44,10 @@ export function RandomPickerPage(): JSX.Element {
   const [filter, setFilter] = useState('')
   const [presetName, setPresetName] = useState('')
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
-  const [rolling, setRolling] = useState(false)
-  const [rollingApp, setRollingApp] = useState<Application | null>(null)
+  const [mode, setModeState] = useState<PickerMode>(loadMode)
+  const [spin, setSpin] = useState<Spin | null>(null)
   const [result, setResult] = useState<Application | null>(null)
-  const timer = useRef<number | null>(null)
+  const revealTimer = useRef<number | null>(null)
 
   const appById = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps])
   const candidates = useMemo(() => apps.filter((a) => selected.has(a.id)), [apps, selected])
@@ -34,6 +55,15 @@ export function RandomPickerPage(): JSX.Element {
     const q = filter.trim().toLowerCase()
     return q ? apps.filter((a) => a.name.toLowerCase().includes(q)) : apps
   }, [apps, filter])
+
+  const setMode = (m: PickerMode): void => {
+    setModeState(m)
+    try {
+      localStorage.setItem(MODE_KEY, m)
+    } catch {
+      // ignore
+    }
+  }
 
   const loadPreset = (id: string | null): void => {
     const preset = id ? presets.find((p) => p.id === id) : undefined
@@ -48,23 +78,55 @@ export function RandomPickerPage(): JSX.Element {
     setResult(null)
   }
 
-  // Arriving via /random?preset=<id>
+  const pick = (pool: Application[], exclude?: string): void => {
+    const usable = pool.filter((c) => pool.length < 3 || c.id !== exclude)
+    if (usable.length === 0 || pool.length < 2) return
+    const winner = usable[randomIndex(usable.length)]
+    setResult(null)
+    if (motion === 'reduced') {
+      setResult(winner)
+      return
+    }
+    setSpin({ key: Date.now(), pool: usable, winner })
+  }
+
+  // Deep links: /random?preset=<id> loads a preset; /random?spin=1 selects everything and spins.
   useEffect(() => {
+    if (!loaded) return
     const presetId = params.get('preset')
-    if (!presetId || !loaded) return
-    loadPreset(presetId)
+    const autoSpin = params.get('spin') === '1'
+    const forcedMode = params.get('mode')
+    if (!presetId && !autoSpin && !forcedMode) return
+    if (forcedMode === 'quick' || forcedMode === 'slots' || forcedMode === 'wheel') setMode(forcedMode)
+    if (presetId) loadPreset(presetId)
+    if (autoSpin) {
+      setSelected(new Set(apps.map((a) => a.id)))
+      pick(apps)
+    }
     const next = new URLSearchParams(params)
     next.delete('preset')
+    next.delete('spin')
+    next.delete('mode')
     setParams(next, { replace: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params, loaded])
 
   useEffect(
     () => () => {
-      if (timer.current) window.clearTimeout(timer.current)
+      if (revealTimer.current) window.clearTimeout(revealTimer.current)
     },
     []
   )
+
+  const onSpinDone = (): void => {
+    if (!spin) return
+    const { winner } = spin
+    // Leave the machine on the winner for a beat before the reveal card.
+    revealTimer.current = window.setTimeout(() => {
+      setResult(winner)
+      setSpin(null)
+    }, 700)
+  }
 
   const toggle = (id: string): void => {
     setSelected((s) => {
@@ -73,31 +135,6 @@ export function RandomPickerPage(): JSX.Element {
       else next.add(id)
       return next
     })
-  }
-
-  const pick = (exclude?: string): void => {
-    const pool = candidates.filter((c) => candidates.length < 3 || c.id !== exclude)
-    if (pool.length === 0 || candidates.length < 2) return
-    setResult(null)
-    if (motion === 'reduced') {
-      setResult(pool[randomIndex(pool.length)])
-      return
-    }
-    setRolling(true)
-    const start = performance.now()
-    const duration = 1600
-    const step = (): void => {
-      const elapsed = performance.now() - start
-      setRollingApp(pool[randomIndex(pool.length)])
-      if (elapsed < duration) {
-        const t = elapsed / duration
-        timer.current = window.setTimeout(step, 55 + t * t * 300) // ease out
-      } else {
-        setRolling(false)
-        setResult(pool[randomIndex(pool.length)])
-      }
-    }
-    step()
   }
 
   const savePreset = async (): Promise<void> => {
@@ -127,6 +164,9 @@ export function RandomPickerPage(): JSX.Element {
       </>
     )
   }
+
+  const busy = spin !== null
+  const modeInfo = MODES.find((m) => m.id === mode) ?? MODES[0]
 
   return (
     <>
@@ -179,27 +219,46 @@ export function RandomPickerPage(): JSX.Element {
         </div>
 
         <div className="picker-panel">
-          {result || rolling ? (
-            <div className={`result ${result ? 'reveal' : ''}`}>
-              <div className="eyebrow">{rolling ? 'Choosing…' : 'Tonight you should play'}</div>
-              {rolling && rollingApp ? (
-                <div className="roll">
-                  <Thumb app={rollingApp} size="lg" />
-                  <div className="name rolling">{rollingApp.name}</div>
-                </div>
+          <div className="picker-mode">
+            <div className="segmented" role="radiogroup" aria-label="Picker style">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m.id}
+                  className={mode === m.id ? 'active' : ''}
+                  title={m.hint}
+                  disabled={busy}
+                  onClick={() => setMode(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {spin ? (
+            <div className="result">
+              <div className="eyebrow">Choosing…</div>
+              {mode === 'slots' ? (
+                <SlotMachine key={spin.key} candidates={spin.pool} winner={spin.winner} onDone={onSpinDone} />
+              ) : mode === 'wheel' ? (
+                <RouletteWheel key={spin.key} candidates={spin.pool} winner={spin.winner} onDone={onSpinDone} />
               ) : (
-                result && (
-                  <>
-                    <CoverImage app={result} showFavorite={false} />
-                    <div className="name">{result.name}</div>
-                  </>
-                )
+                <QuickShuffle key={spin.key} candidates={spin.pool} winner={spin.winner} onDone={onSpinDone} />
               )}
+            </div>
+          ) : result ? (
+            <div className="result reveal">
+              <div className="eyebrow">Tonight you should play</div>
+              <CoverImage app={result} showFavorite={false} />
+              <div className="name">{result.name}</div>
               <div className="buttons">
-                <button className="btn play lg" disabled={rolling} onClick={() => result && void launch(result)}>
+                <button className="btn play lg" onClick={() => void launch(result)}>
                   <IconPlay /> PLAY
                 </button>
-                <button className="btn lg" disabled={rolling} onClick={() => pick(result?.id)}>
+                <button className="btn lg" onClick={() => pick(candidates, result.id)}>
                   <IconRefresh /> Reroll
                 </button>
               </div>
@@ -207,11 +266,14 @@ export function RandomPickerPage(): JSX.Element {
           ) : (
             <>
               <h3>Ready?</h3>
-              <button className="btn primary lg block" disabled={candidates.length < 2} onClick={() => pick()}>
-                <IconDice /> PICK FOR ME
+              <button className="btn primary lg block" disabled={candidates.length < 2} onClick={() => pick(candidates)}>
+                <IconDice /> {mode === 'wheel' ? 'SPIN THE WHEEL' : mode === 'slots' ? 'PULL THE LEVER' : 'PICK FOR ME'}
               </button>
               <div className="muted" style={{ fontSize: 12, textAlign: 'center' }}>
-                {candidates.length < 2 ? 'Select at least two candidates.' : `Choosing from ${candidates.length} candidates.`}
+                {candidates.length < 2
+                  ? 'Select at least two candidates.'
+                  : `${modeInfo.hint} · choosing from ${candidates.length} candidates.`}
+                {motion === 'reduced' && candidates.length >= 2 && ' Reduce motion is on, so the result appears instantly.'}
               </div>
             </>
           )}

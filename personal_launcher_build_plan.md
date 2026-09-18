@@ -1,4 +1,4 @@
-# Personal Launcher — Build Plan
+# Launchpad (formerly "Personal Launcher") — Build Plan
 
 ## 1. Project Goal
 

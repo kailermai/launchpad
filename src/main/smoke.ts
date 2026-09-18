@@ -8,7 +8,7 @@ import { Store } from './db'
 import { cleanDisplayName, extractIcon, readDroppedFileMetadata } from './files'
 import { extractLargestIcon } from './icons'
 import { checkAllTargets, checkTarget } from './launch'
-import { getPaths, resolveInsideAssets } from './paths'
+import { getPaths, resolveDataDir, resolveInsideAssets } from './paths'
 import { validateLaunchTarget } from './validate'
 
 /**
@@ -39,6 +39,17 @@ export async function runSmoke(): Promise<void> {
   assert.equal(validateLaunchTarget('uri', 'file:///C:/Windows').ok, false)
   assert.equal(validateLaunchTarget('command' as never, 'cmd /c dir').ok, false)
   ok('validators accept only .exe/.lnk/steam/https')
+
+  // --- data-folder rename migration (PersonalLauncher -> Launchpad) ---
+  const fakeAppData = path.join(paths.dataDir, 'fake-appdata')
+  fs.mkdirSync(path.join(fakeAppData, 'PersonalLauncher'), { recursive: true })
+  fs.writeFileSync(path.join(fakeAppData, 'PersonalLauncher', 'launcher.db'), 'x')
+  assert.equal(resolveDataDir(fakeAppData), path.join(fakeAppData, 'Launchpad'))
+  assert.ok(fs.existsSync(path.join(fakeAppData, 'Launchpad', 'launcher.db')))
+  assert.ok(!fs.existsSync(path.join(fakeAppData, 'PersonalLauncher')))
+  assert.equal(resolveDataDir(fakeAppData), path.join(fakeAppData, 'Launchpad')) // idempotent
+  fs.rmSync(fakeAppData, { recursive: true, force: true })
+  ok('legacy data folder is renamed in place, once')
 
   // --- asset path guard (Safety Rule 4) ---
   assert.equal(resolveInsideAssets('../launcher.db'), null)

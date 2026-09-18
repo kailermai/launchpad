@@ -17,7 +17,7 @@ import { isSmokeRun, smokeMain } from './smoke'
 
 if (isSmokeRun()) {
   // Self-test mode: point everything at a throwaway folder and never open a window.
-  app.setPath('userData', process.env['SMOKE_DIR'] ?? path.join(app.getPath('temp'), 'PersonalLauncher-smoke'))
+  app.setPath('userData', process.env['SMOKE_DIR'] ?? path.join(app.getPath('temp'), 'Launchpad-smoke'))
   void app.whenReady().then(smokeMain)
 } else if (dataDirOverride()) {
   app.setPath('userData', dataDirOverride()!)
@@ -56,7 +56,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0b0912',
-    title: 'Personal Launcher',
+    title: 'Launchpad',
     // Our own title bar area; Windows keeps its native minimise/maximise/close buttons + Snap Layouts.
     titleBarStyle: 'hidden',
     titleBarOverlay: { color: '#120f1e', symbolColor: '#ece9f7', height: TITLEBAR_HEIGHT },

@@ -50,7 +50,7 @@ export async function exportBackup(win: BrowserWindow, store: Store): Promise<{ 
   const date = new Date().toISOString().slice(0, 10)
   const result = await dialog.showSaveDialog(win, {
     title: 'Export library backup',
-    defaultPath: `personal-launcher-backup-${date}.json`,
+    defaultPath: `launchpad-backup-${date}.json`,
     filters: [{ name: 'Launcher backup', extensions: ['json'] }]
   })
   if (result.canceled || !result.filePath) return { ok: false, message: 'Export cancelled.' }
@@ -91,7 +91,7 @@ export async function loadBackupFile(file: string): Promise<BackupSummary> {
     throw new Error('That file is not valid JSON.')
   }
   if (!isRecord(parsed) || parsed.version !== BACKUP_VERSION) {
-    throw new Error('That file is not a Personal Launcher backup (or is from a newer version).')
+    throw new Error('That file is not a Launchpad backup (or is from a newer version).')
   }
   const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
   const data: BackupFile = {

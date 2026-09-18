@@ -1,4 +1,4 @@
-# Personal Launcher
+# Launchpad
 
 A safe, local-first Windows launcher: a clean visual shelf for the games and
 applications **you** choose to add. It replaces desktop-shortcut clutter and
@@ -13,7 +13,7 @@ goes online.
 - Cover art of your choice (a copy is kept in the launcher's own folder)
 - Platforms and categories (fully customisable), favorites, search and filters
 - Recently launched (tracked only when you press Play here)
-- Random picker with saved presets ("Chill", "Multiplayer", …)
+- Random picker with saved presets ("Chill", "Multiplayer", …) and three styles: Quick shuffle, Slot machine, Roulette wheel
 - JSON backup export / restore (merge or replace)
 - Library Health: find entries whose files no longer exist
 - Appearance: three purple palettes (Violet Night, Plum & Gold, Synthwave), grid density, reduce motion — Settings → Appearance
@@ -62,7 +62,7 @@ src/preload/    the narrow contextBridge API (window.launcher)
 src/renderer/   React UI (styles/tokens.css holds the three palettes)
 ```
 
-Data lives in `%APPDATA%\PersonalLauncher\`:
+Data lives in `%APPDATA%\Launchpad\` (an existing `%APPDATA%\PersonalLauncher\` folder from older builds is renamed in place on first start):
 
 ```
 launcher.db     SQLite database (written atomically)
