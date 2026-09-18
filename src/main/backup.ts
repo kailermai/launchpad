@@ -76,7 +76,11 @@ export async function inspectBackup(win: BrowserWindow): Promise<BackupSummary |
     filters: [{ name: 'Launcher backup', extensions: ['json'] }]
   })
   if (result.canceled || result.filePaths.length === 0) return null
-  const file = result.filePaths[0]
+  return loadBackupFile(result.filePaths[0])
+}
+
+/** Parses and validates the shape of a backup file the user picked, and registers it for import. */
+export async function loadBackupFile(file: string): Promise<BackupSummary> {
   const stat = await fs.promises.stat(file)
   if (!stat.isFile() || stat.size > MAX_BACKUP_BYTES) throw new Error('That file is too large to be a launcher backup.')
 

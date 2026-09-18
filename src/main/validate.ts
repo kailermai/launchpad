@@ -29,7 +29,7 @@ function isSanePath(p: string): boolean {
   if (p.includes('\0')) return false
   if (!path.win32.isAbsolute(p)) return false
   // UNC or drive-letter absolute paths only; nothing relative sneaks through.
-  return /^[a-zA-Z]:[\/]/.test(p) || p.startsWith('\\')
+  return /^[a-zA-Z]:[\\/]/.test(p) || p.startsWith('\\\\')
 }
 
 /**
@@ -60,12 +60,12 @@ export function validateLaunchTarget(launchType: unknown, target: unknown): Vali
     return { ok: true, normalized: trimmed }
   }
 
-  if (!isSanePath(trimmed)) return { ok: false, message: 'Launch target must be a full path (for example C:\Games\Game.exe).' }
+  if (!isSanePath(trimmed)) return { ok: false, message: 'Launch target must be a full path (for example C:\\Games\\Game.exe).' }
   const expected = ALLOWED_EXTENSIONS[launchType]
   if (path.extname(trimmed).toLowerCase() !== expected) {
     return { ok: false, message: `A ${launchType} must end in ${expected}.` }
   }
-  const normalized = path.win32.normalize(trimmed).replace(/[\/]+$/, '').toLowerCase()
+  const normalized = path.win32.normalize(trimmed).replace(/[\\/]+$/, '').toLowerCase()
   return { ok: true, normalized }
 }
 

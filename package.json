@@ -12,7 +12,8 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview",
-    "package": "npm run build && electron-builder --win --config electron-builder.yml"
+    "package": "npm run build && electron-builder --win --config electron-builder.yml",
+    "smoke": "electron-vite build && electron . --smoke"
   },
   "dependencies": {
     "sql.js": "^1.13.0"

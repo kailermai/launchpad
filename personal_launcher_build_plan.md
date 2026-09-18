@@ -87,16 +87,27 @@ Removing an entry must only remove launcher metadata.
 
 ## Desktop Framework
 
-**Tauri + React + TypeScript**
+**Electron + React + TypeScript** (chosen 2026-09-18; Tauri was the first pick but needs the Rust + MSVC toolchains, which are not installed on this PC)
 
 Why:
 
-- lightweight native Windows application
+- runs on the Node toolchain already installed — nothing else to install system-wide
 - frontend development stays familiar and fast
-- easy to create polished interfaces
-- native file dialogs and drag-and-drop support
+- native file dialogs, drag-and-drop, `.lnk` reading and icon extraction are built in
 - does not require a separate backend
-- can launch explicitly configured files through a narrow native interface
+- launches explicitly configured files through a narrow, typed preload bridge
+
+How the five Safety Rules map to Electron:
+
+| Rule | Electron mechanism |
+|---|---|
+| 1 | `.exe` → `child_process.spawn(path, [], { shell: false })`; `.lnk` → `shell.openPath`; links → `shell.openExternal` |
+| 2 | Renderer calls `launchApplication(id)`; main process reads the path from the database |
+| 3 | `src/main/validate.ts` allowlist, applied on save, import and launch |
+| 4 | Only the main process touches disk, under `app.getPath('userData')` = `%APPDATA%\PersonalLauncher\` |
+| 5 | `contextIsolation` + `sandbox`, no `nodeIntegration`, strict CSP, navigation blocked, `cover://` protocol scoped to `assets/` |
+
+SQLite is provided by `sql.js` (SQLite compiled to WebAssembly — no native compiler needed); the database file is rewritten atomically after every committed transaction.
 
 ## Database
 

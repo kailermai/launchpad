@@ -1,9 +1,11 @@
 import { app, BrowserWindow, Menu, net, protocol, session } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { dataDirOverride, initialRoute, renderIcon, renderIconPath, scheduleScreenshot, screenshotPath } from './capture'
 import { Store } from './db'
 import { registerIpc } from './ipc'
 import { configureUserData, getPaths, resolveInsideAssets } from './paths'
+import { isSmokeRun, smokeMain } from './smoke'
 
 /**
  * Safety Rule 5: the window is a locked-down webview.
@@ -13,7 +15,15 @@ import { configureUserData, getPaths, resolveInsideAssets } from './paths'
  *    reads files from the launcher's own assets folder
  */
 
-configureUserData()
+if (isSmokeRun()) {
+  // Self-test mode: point everything at a throwaway folder and never open a window.
+  app.setPath('userData', process.env['SMOKE_DIR'] ?? path.join(app.getPath('temp'), 'PersonalLauncher-smoke'))
+  void app.whenReady().then(smokeMain)
+} else if (dataDirOverride()) {
+  app.setPath('userData', dataDirOverride()!)
+} else {
+  configureUserData()
+}
 
 // Lets <img src="cover://local/<file>"> work like a normal, secure origin.
 protocol.registerSchemesAsPrivileged([
@@ -47,6 +57,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     backgroundColor: '#0e1116',
     title: 'Personal Launcher',
+    icon: app.isPackaged ? undefined : path.join(app.getAppPath(), 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -63,6 +74,8 @@ function createWindow(): void {
   win.on('closed', () => {
     mainWindow = null
   })
+  const shot = screenshotPath()
+  if (shot) scheduleScreenshot(win, shot)
 
   // No navigation away from our own page, and no new windows, ever.
   win.webContents.on('will-navigate', (event, url) => {
@@ -75,9 +88,9 @@ function createWindow(): void {
     win.webContents.on('before-input-event', (_event, input) => {
       if (input.key === 'F12' && input.type === 'keyDown') win.webContents.toggleDevTools()
     })
-    win.loadURL(process.env['ELECTRON_RENDERER_URL']!)
+    win.loadURL(process.env['ELECTRON_RENDERER_URL']! + (initialRoute() ? `#${initialRoute()}` : ''))
   } else {
-    win.loadFile(path.join(__dirname, '../renderer/index.html'))
+    win.loadFile(path.join(__dirname, '../renderer/index.html'), { hash: initialRoute() ?? undefined })
   }
 }
 
@@ -94,6 +107,12 @@ app.on('second-instance', () => {
 })
 
 app.whenReady().then(async () => {
+  if (isSmokeRun()) return
+  const iconFile = renderIconPath()
+  if (iconFile) {
+    await renderIcon(iconFile)
+    return
+  }
   Menu.setApplicationMenu(null)
   registerCoverProtocol()
 
