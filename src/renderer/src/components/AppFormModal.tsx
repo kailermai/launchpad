@@ -18,7 +18,8 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
 
   const [name, setName] = useState(app?.name ?? prefill?.suggestedName ?? '')
   const [launchType, setLaunchType] = useState<LaunchType>(app?.launchType ?? prefill?.launchType ?? 'executable')
-  const [target, setTarget] = useState(app?.launchTarget ?? prefill?.path ?? '')
+  const [target, setTarget] = useState(app?.launchTarget ?? prefill?.launchTarget ?? '')
+  const [iconPath, setIconPath] = useState<string | null>(prefill?.iconPath ?? null)
   const [platformId, setPlatformId] = useState(app?.platformId ?? '')
   const [categoryId, setCategoryId] = useState(app?.categoryId ?? '')
   const [coverPath, setCoverPath] = useState<string | null>(app?.coverPath ?? null)
@@ -31,8 +32,9 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
   const browse = async (): Promise<void> => {
     const meta = await api.chooseApplicationFile()
     if (!meta) return
-    setTarget(meta.path)
+    setTarget(meta.launchTarget)
     setLaunchType(meta.launchType)
+    setIconPath(meta.iconPath)
     if (!name.trim()) setName(meta.suggestedName)
   }
 
@@ -51,6 +53,7 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
       launchType,
       launchTarget: target,
       coverPath,
+      iconPath,
       platformId: platformId || null,
       categoryId: categoryId || null,
       favorite
@@ -113,16 +116,14 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
               placeholder={isFile ? 'C:\\Games\\Game\\Game.exe' : 'steam://rungameid/1145360'}
               spellCheck={false}
             />
-            {isFile && (
-              <button type="button" className="btn" onClick={() => void browse()}>
-                Browse…
-              </button>
-            )}
+            <button type="button" className="btn" onClick={() => void browse()}>
+              Browse…
+            </button>
           </div>
           <div className="hint">
             {isFile
               ? 'Only .exe and .lnk files can be launched. The file itself is never modified.'
-              : 'Only steam:// and https:// links are supported.'}
+              : 'Only steam:// and https:// links are supported. You can also browse to a Steam desktop shortcut (.url).'}
           </div>
         </div>
 

@@ -8,6 +8,7 @@ goes online.
 ## What it does
 
 - Add `.exe` files, `.lnk` shortcuts, `steam://` and `https://` links — manually or by dragging them into the window
+- Steam desktop shortcuts (`.url` files) can be dropped too: the `steam://rungameid/…` inside becomes the entry, with the game's icon
 - Name and icon are prefilled from the dropped file; you can edit before saving
 - Cover art of your choice (a copy is kept in the launcher's own folder)
 - Platforms and categories (fully customisable), favorites, search and filters

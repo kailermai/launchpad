@@ -4,7 +4,7 @@ import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { DroppedFileMeta } from '../shared/types'
 import { getPaths, resolveInsideAssets } from './paths'
-import { launchTypeForFile } from './validate'
+import { launchTypeForFile, validateLaunchTarget } from './validate'
 
 /**
  * Everything here is read-only with respect to the user's files. The only
@@ -56,6 +56,9 @@ export async function readDroppedFileMetadata(filePath: unknown): Promise<Droppe
   const fileName = path.basename(filePath)
   const stem = fileName.slice(0, -path.extname(fileName).length)
   let shortcutTarget: string | null = null
+  let launchTarget = filePath
+  let iconPath: string | null = null
+
   if (launchType === 'shortcut') {
     try {
       // Read-only parse of the .lnk; Electron never writes to it.
@@ -63,15 +66,41 @@ export async function readDroppedFileMetadata(filePath: unknown): Promise<Droppe
     } catch {
       shortcutTarget = null
     }
+  } else if (launchType === 'uri') {
+    // .url is a tiny INI file: the URL inside becomes the entry, and only if its scheme is allowed.
+    const url = await readInternetShortcut(filePath, stat.size)
+    if (!url || !validateLaunchTarget('uri', url).ok) return null
+    launchTarget = url
+    iconPath = await extractIcon(filePath)
   }
 
   return {
     path: filePath,
     fileName,
     launchType,
+    launchTarget,
     suggestedName: cleanDisplayName(stem),
-    shortcutTarget
+    shortcutTarget,
+    iconPath
   }
+}
+
+const MAX_URL_FILE_BYTES = 64 * 1024
+
+/** Reads the URL= line from a .url (Internet shortcut) file. Read-only. */
+async function readInternetShortcut(filePath: string, size: number): Promise<string | null> {
+  if (size > MAX_URL_FILE_BYTES) return null
+  const text = await fs.promises.readFile(filePath, 'utf8')
+  let inShortcutSection = false
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (line.startsWith('[')) {
+      inShortcutSection = line.toLowerCase() === '[internetshortcut]'
+      continue
+    }
+    if (inShortcutSection && /^url=/i.test(line)) return line.slice(4).trim() || null
+  }
+  return null
 }
 
 export async function chooseApplicationFile(win: BrowserWindow): Promise<DroppedFileMeta | null> {
@@ -79,9 +108,10 @@ export async function chooseApplicationFile(win: BrowserWindow): Promise<Dropped
     title: 'Choose an application or shortcut',
     properties: ['openFile'],
     filters: [
-      { name: 'Applications and shortcuts', extensions: ['exe', 'lnk'] },
+      { name: 'Applications and shortcuts', extensions: ['exe', 'lnk', 'url'] },
       { name: 'Applications', extensions: ['exe'] },
-      { name: 'Shortcuts', extensions: ['lnk'] }
+      { name: 'Shortcuts', extensions: ['lnk'] },
+      { name: 'Internet shortcuts (Steam)', extensions: ['url'] }
     ]
   })
   if (result.canceled || result.filePaths.length === 0) return null

@@ -16,11 +16,16 @@ export function isLaunchType(value: unknown): value is LaunchType {
   return typeof value === 'string' && (LAUNCH_TYPES as string[]).includes(value)
 }
 
-/** Which launch type a user-picked file maps to, or null if we do not support it. */
-export function launchTypeForFile(filePath: string): 'executable' | 'shortcut' | null {
+/**
+ * Which launch type a user-picked file maps to, or null if we do not support it.
+ * A .url (Internet shortcut, e.g. Steam's desktop shortcuts) becomes a link entry
+ * holding the URL inside it — the URL still has to pass the scheme allowlist.
+ */
+export function launchTypeForFile(filePath: string): LaunchType | null {
   const ext = path.extname(filePath).toLowerCase()
   if (ext === ALLOWED_EXTENSIONS.executable) return 'executable'
   if (ext === ALLOWED_EXTENSIONS.shortcut) return 'shortcut'
+  if (ext === '.url') return 'uri'
   return null
 }
 
@@ -97,11 +102,13 @@ export function sanitizeApplicationInput(raw: unknown): ApplicationInput {
   if (!isLaunchType(r.launchType)) throw new Error('Unknown launch type.')
   if (typeof r.name !== 'string' || typeof r.launchTarget !== 'string') throw new Error('Invalid application data.')
   const coverPath = r.coverPath === undefined || r.coverPath === null ? null : String(r.coverPath)
+  const iconPath = r.iconPath === undefined || r.iconPath === null ? null : String(r.iconPath)
   return {
     name: r.name,
     launchType: r.launchType,
     launchTarget: r.launchTarget,
     coverPath,
+    iconPath,
     platformId: optionalId(r.platformId),
     categoryId: optionalId(r.categoryId),
     favorite: Boolean(r.favorite)

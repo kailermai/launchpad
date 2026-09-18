@@ -25,6 +25,8 @@ export interface ApplicationInput {
   launchType: LaunchType
   launchTarget: string
   coverPath?: string | null
+  /** Icon asset already extracted at drop time (for .url links); must be a launcher asset. */
+  iconPath?: string | null
   platformId?: string | null
   categoryId?: string | null
   favorite?: boolean
@@ -58,12 +60,17 @@ export interface PickerPresetInput {
 
 /** What the main process learns from a file the user explicitly chose or dropped. */
 export interface DroppedFileMeta {
+  /** The file that was dropped or picked. */
   path: string
   fileName: string
-  launchType: 'executable' | 'shortcut'
+  launchType: LaunchType
+  /** What to store as the launch target: the file path for .exe/.lnk, the URL inside a .url file. */
+  launchTarget: string
   suggestedName: string
-  /** For shortcuts: the path the shortcut points at, if it could be read. */
+  /** For .lnk shortcuts: the path the shortcut points at, if it could be read. */
   shortcutTarget: string | null
+  /** For .url links: the icon Windows shows for the shortcut, already copied into assets. */
+  iconPath: string | null
 }
 
 export interface TargetStatus {

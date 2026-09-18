@@ -10,7 +10,7 @@ function referencedElsewhere(store: Store, exceptId: string | null) {
     store.listApplications().some((a) => a.id !== exceptId && (a.coverPath === fileName || a.iconPath === fileName))
 }
 
-type Prepared = { ok: true; value: Omit<NewApplication, 'iconPath'> } | { ok: false; result: SaveResult }
+type Prepared = { ok: true; value: NewApplication } | { ok: false; result: SaveResult }
 
 function prepare(store: Store, raw: unknown, currentId: string | null): Prepared {
   let input
@@ -37,6 +37,7 @@ function prepare(store: Store, raw: unknown, currentId: string | null): Prepared
       launchTarget: input.launchTarget.trim(),
       normalized: target.normalized,
       coverPath: assetExists(input.coverPath ?? null) ? input.coverPath! : null,
+      iconPath: assetExists(input.iconPath ?? null) ? input.iconPath! : null,
       platformId: input.platformId ?? null,
       categoryId: input.categoryId ?? null,
       favorite: Boolean(input.favorite)
@@ -47,7 +48,9 @@ function prepare(store: Store, raw: unknown, currentId: string | null): Prepared
 export async function addApplication(store: Store, raw: unknown): Promise<SaveResult> {
   const prepared = prepare(store, raw, null)
   if (!prepared.ok) return prepared.result
-  const iconPath = prepared.value.launchType === 'uri' ? null : await extractIcon(prepared.value.launchTarget)
+  // Links have no file to read an icon from; a dropped .url may already have supplied one.
+  const iconPath =
+    prepared.value.launchType === 'uri' ? prepared.value.iconPath : await extractIcon(prepared.value.launchTarget)
   const application = store.insertApplication({ ...prepared.value, iconPath })
   return { ok: true, application }
 }
@@ -62,7 +65,8 @@ export async function updateApplication(store: Store, id: string, raw: unknown):
   const previous = validateLaunchTarget(existing.launchType, existing.launchTarget)
   const targetChanged = !previous.ok || previous.normalized !== prepared.value.normalized
   if (targetChanged) {
-    iconPath = prepared.value.launchType === 'uri' ? null : await extractIcon(prepared.value.launchTarget)
+    iconPath =
+      prepared.value.launchType === 'uri' ? prepared.value.iconPath : await extractIcon(prepared.value.launchTarget)
   }
 
   const application = store.updateApplication(id, { ...prepared.value, iconPath })

@@ -46,7 +46,7 @@ export function DropOverlay(): JSX.Element | null {
         const path = api.getPathForFile(file)
         const meta = path ? await api.readDroppedFileMetadata(path) : null
         if (!meta) {
-          toast(`This file type is not supported.\nSupported: .exe and .lnk`, 'error')
+          toast(`This file type is not supported.\nSupported: .exe, .lnk and Steam .url shortcuts`, 'error')
           return
         }
         openAdd(meta)
@@ -70,7 +70,7 @@ export function DropOverlay(): JSX.Element | null {
     <div className="drop-overlay">
       <div className="box">
         <h2>DROP TO ADD</h2>
-        <p>{label || 'Drop a .exe or .lnk to add it to your library'}</p>
+        <p>{label || 'Drop a .exe, .lnk or Steam .url shortcut to add it to your library'}</p>
       </div>
     </div>
   )

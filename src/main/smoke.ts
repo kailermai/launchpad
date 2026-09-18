@@ -63,6 +63,20 @@ export async function runSmoke(): Promise<void> {
   assert.equal(await readDroppedFileMetadata('relative.exe'), null)
   ok('dropped-file metadata refuses folders and unsupported types')
 
+  // --- Steam-style .url shortcuts: the URL inside must pass the same allowlist ---
+  const urlFile = path.join(paths.dataDir, 'Hades.url')
+  fs.writeFileSync(urlFile, '[InternetShortcut]\r\nURL=steam://rungameid/1145360\r\nIconFile=C:\\nowhere.ico\r\n')
+  const urlMeta = await readDroppedFileMetadata(urlFile)
+  assert.ok(urlMeta && urlMeta.launchType === 'uri' && urlMeta.launchTarget === 'steam://rungameid/1145360')
+  assert.equal(urlMeta.suggestedName, 'Hades')
+  const badUrlFile = path.join(paths.dataDir, 'Evil.url')
+  fs.writeFileSync(badUrlFile, '[InternetShortcut]\r\nURL=ms-msdt:/id PCWDiagnostic\r\n')
+  assert.equal(await readDroppedFileMetadata(badUrlFile), null)
+  fs.writeFileSync(badUrlFile, '[InternetShortcut]\r\nURL=file:///C:/Windows/System32/cmd.exe\r\n')
+  assert.equal(await readDroppedFileMetadata(badUrlFile), null)
+  fs.unlinkSync(badUrlFile)
+  ok('.url shortcuts accepted only with steam:// or https:// inside')
+
   // --- store ---
   const store = await Store.open(paths.dbFile)
   assert.equal(store.listLabels('platforms').length, 6)
@@ -178,6 +192,16 @@ export async function runSmoke(): Promise<void> {
   })
   assert.ok(demo.ok)
   reopened.markLaunched(demo.application.id)
+  const steamDemo = await addApplication(reopened, {
+    name: 'Hades',
+    launchType: 'uri',
+    launchTarget: 'steam://rungameid/1145360',
+    iconPath: urlMeta.iconPath,
+    platformId: reopened.findLabelByName('platforms', 'Epic')?.id ?? null,
+    categoryId: reopened.findLabelByName('categories', 'Game')?.id ?? null
+  })
+  assert.ok(steamDemo.ok && steamDemo.application.launchType === 'uri')
+  fs.unlinkSync(urlFile)
   fs.unlinkSync(backupFile)
 
   console.log(results.join('\n'))
