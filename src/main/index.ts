@@ -3,7 +3,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { dataDirOverride, initialRoute, renderIcon, renderIconPath, scheduleScreenshot, screenshotPath } from './capture'
 import { Store } from './db'
-import { registerIpc } from './ipc'
+import { registerIpc, TITLEBAR_HEIGHT } from './ipc'
 import { configureUserData, getPaths, resolveInsideAssets } from './paths'
 import { isSmokeRun, smokeMain } from './smoke'
 
@@ -55,8 +55,11 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     autoHideMenuBar: true,
-    backgroundColor: '#0e1116',
+    backgroundColor: '#0b0912',
     title: 'Personal Launcher',
+    // Our own title bar area; Windows keeps its native minimise/maximise/close buttons + Snap Layouts.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#120f1e', symbolColor: '#ece9f7', height: TITLEBAR_HEIGHT },
     icon: app.isPackaged ? undefined : path.join(app.getAppPath(), 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

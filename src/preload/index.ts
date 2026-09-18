@@ -43,7 +43,8 @@ const api: LauncherApi = {
   importBackup: (token, mode) => invoke(IPC.importBackup, token, mode),
 
   getAppInfo: () => invoke(IPC.getAppInfo),
-  openDataFolder: () => invoke(IPC.openDataFolder)
+  openDataFolder: () => invoke(IPC.openDataFolder),
+  setTitleBarColors: (color, symbolColor) => invoke(IPC.setTitleBarColors, color, symbolColor)
 }
 
 contextBridge.exposeInMainWorld('launcher', api)

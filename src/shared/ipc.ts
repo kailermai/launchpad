@@ -32,7 +32,8 @@ export const IPC = {
   importBackup: 'backup:import',
 
   getAppInfo: 'app:info',
-  openDataFolder: 'app:openDataFolder'
+  openDataFolder: 'app:openDataFolder',
+  setTitleBarColors: 'app:titleBarColors'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

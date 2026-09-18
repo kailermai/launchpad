@@ -169,4 +169,6 @@ export interface LauncherApi {
   // misc
   getAppInfo(): Promise<AppInfo>
   openDataFolder(): Promise<void>
+  /** Recolours the native title-bar buttons to match the theme. Both values must be #rrggbb. */
+  setTitleBarColors(color: string, symbolColor: string): Promise<void>
 }

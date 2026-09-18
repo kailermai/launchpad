@@ -40,9 +40,9 @@ export function App(): JSX.Element {
   useShortcuts()
   return (
     <div className="shell">
+      <TopBar />
       <Sidebar />
       <div className="main">
-        <TopBar />
         <main className="content">
           <Routes>
             <Route path="/" element={<HomePage />} />

@@ -1,0 +1,138 @@
+/* ------------------------------------------------------------------------
+   Design tokens. Colour tokens are defined per theme so that any element
+   carrying data-theme (the <html> element, or a preview swatch) renders in
+   that palette. Shared shape / motion / layout tokens live on :root only.
+   ------------------------------------------------------------------------ */
+
+/* A. Violet Night (default) ------------------------------------------------ */
+:root,
+[data-theme='violet'] {
+  --bg: #0b0912;
+  --bg-elev: #120f1e;
+  --bg-card: #191530;
+  --bg-hover: #211c3d;
+  --border: #2a2547;
+  --border-strong: #3b3563;
+  --text: #ece9f7;
+  --muted: #9a94b8;
+  --faint: #6a6590;
+  --accent: #7c3aed;
+  --accent-strong: #a78bfa;
+  --accent-soft: rgba(139, 92, 246, 0.16);
+  --accent-glow: rgba(139, 92, 246, 0.35);
+  --play: #34d399;
+  --play-hover: #6ee7b7;
+  --play-text: #06281b;
+  --star: #fbbf24;
+  --danger: #fb7185;
+  --danger-soft: rgba(251, 113, 133, 0.14);
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --success: #34d399;
+  --tile-hue: 262;
+  --titlebar: #120f1e;
+  --titlebar-symbol: #ece9f7;
+  color-scheme: dark;
+}
+
+/* B. Plum & Gold ------------------------------------------------------------ */
+[data-theme='plum'] {
+  --bg: #100a14;
+  --bg-elev: #180f1f;
+  --bg-card: #221530;
+  --bg-hover: #2c1c3d;
+  --border: #3a2750;
+  --border-strong: #4d3468;
+  --text: #f3ecf7;
+  --muted: #a795b3;
+  --faint: #75637f;
+  --accent: #9d4edd;
+  --accent-strong: #c77dff;
+  --accent-soft: rgba(157, 78, 221, 0.18);
+  --accent-glow: rgba(157, 78, 221, 0.38);
+  --play: #f5c453;
+  --play-hover: #ffd979;
+  --play-text: #2b1d00;
+  --star: #f5c453;
+  --tile-hue: 285;
+  --titlebar: #180f1f;
+  --titlebar-symbol: #f3ecf7;
+}
+
+/* C. Synthwave --------------------------------------------------------------- */
+[data-theme='synthwave'] {
+  --bg: #0a0714;
+  --bg-elev: #120b22;
+  --bg-card: #1a1030;
+  --bg-hover: #241640;
+  --border: #33205a;
+  --border-strong: #472d78;
+  --text: #f1ecff;
+  --muted: #a99fcc;
+  --faint: #7068a3;
+  --accent: #7e22ce;
+  --accent-strong: #d8b4fe;
+  --accent-soft: rgba(168, 85, 247, 0.2);
+  --accent-glow: rgba(168, 85, 247, 0.42);
+  --play: #22d3ee;
+  --play-hover: #67e8f9;
+  --play-text: #062a30;
+  --star: #f472b6;
+  --tile-hue: 275;
+  --titlebar: #120b22;
+  --titlebar-symbol: #f1ecff;
+}
+
+/* Shared --------------------------------------------------------------------- */
+:root {
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-text: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', 'Cascadia Mono', Consolas, ui-monospace, monospace;
+
+  --r-1: 8px;
+  --r-2: 12px;
+  --r-3: 16px;
+  --r-4: 22px;
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 260ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --sidebar-w: 232px;
+  --titlebar-h: 40px;
+  --content-x: 30px;
+
+  --card-min: 176px;
+  --grid-gap: 20px;
+}
+
+[data-density='compact'] {
+  --card-min: 140px;
+  --grid-gap: 14px;
+  --content-x: 22px;
+}
+
+/* Motion off: manual toggle or OS preference. */
+[data-motion='reduced'] *,
+[data-motion='reduced'] *::before,
+[data-motion='reduced'] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

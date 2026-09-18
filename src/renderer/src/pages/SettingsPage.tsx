@@ -4,6 +4,7 @@ import type { AppInfo, BackupSummary, MissingTarget, Platform, RestoreMode } fro
 import { api } from '@/api'
 import { ConfirmModal } from '@/components/Modal'
 import { useLibrary } from '@/store/LibraryContext'
+import { useAppearance, type ThemeInfo } from '@/store/AppearanceContext'
 import { useNavigate } from 'react-router-dom'
 
 export function SettingsPage(): JSX.Element {
@@ -18,6 +19,9 @@ export function SettingsPage(): JSX.Element {
         <nav className="settings-nav">
           <NavLink to="/settings" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             General
+          </NavLink>
+          <NavLink to="/settings/appearance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Appearance
           </NavLink>
           <NavLink to="/settings/platforms" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Platforms
@@ -35,6 +39,7 @@ export function SettingsPage(): JSX.Element {
         <div className="settings-panel">
           <Routes>
             <Route index element={<GeneralSettings />} />
+            <Route path="appearance" element={<AppearanceSettings />} />
             <Route path="platforms" element={<LabelManager kind="platforms" />} />
             <Route path="categories" element={<LabelManager kind="categories" />} />
             <Route path="backup" element={<BackupSettings />} />
@@ -137,6 +142,79 @@ function GeneralSettings(): JSX.Element {
             <span className="muted">{d}</span>
           </div>
         ))}
+      </div>
+    </>
+  )
+}
+
+// ---- Appearance ---------------------------------------------------------------------
+
+function ThemeSwatch({ info, active, onPick }: { info: ThemeInfo; active: boolean; onPick: () => void }): JSX.Element {
+  // The swatch carries its own data-theme, so it previews in that palette.
+  return (
+    <button type="button" className={`theme-swatch ${active ? 'active' : ''}`} data-theme={info.id} onClick={onPick} aria-pressed={active}>
+      <div className="swatch-preview">
+        <div className="swatch-side">
+          <i className="on" />
+          <i />
+          <i />
+          <i />
+        </div>
+        <div className="swatch-main">
+          <span className="swatch-tile" />
+          <span className="swatch-tile alt" />
+          <span className="swatch-accent">+ ADD</span>
+          <span className="swatch-play">▶ PLAY</span>
+        </div>
+      </div>
+      <div className="swatch-name">{info.name}</div>
+      <div className="swatch-desc">{info.description}</div>
+      <div className="swatch-dots" aria-hidden="true">
+        {info.dots.map((c, i) => (
+          <i key={i} style={{ background: c }} />
+        ))}
+      </div>
+    </button>
+  )
+}
+
+function AppearanceSettings(): JSX.Element {
+  const { theme, density, motion, themes, setTheme, setDensity, setMotion } = useAppearance()
+  return (
+    <>
+      <h2>Appearance</h2>
+      <p className="lead">Pick a palette. Changes apply instantly and are remembered on this PC.</p>
+
+      <div className="theme-grid">
+        {themes.map((t) => (
+          <ThemeSwatch key={t.id} info={t} active={theme === t.id} onPick={() => setTheme(t.id)} />
+        ))}
+      </div>
+
+      <h2 className="sub">Layout</h2>
+      <div className="setting-group">
+        <div className="switch" role="group" aria-label="Grid density">
+          <div>
+            <div className="title">Grid density</div>
+            <div className="desc">Comfortable shows larger covers; compact fits more on screen.</div>
+          </div>
+          <div className="segmented">
+            <button type="button" className={density === 'comfortable' ? 'active' : ''} onClick={() => setDensity('comfortable')}>
+              Comfortable
+            </button>
+            <button type="button" className={density === 'compact' ? 'active' : ''} onClick={() => setDensity('compact')}>
+              Compact
+            </button>
+          </div>
+        </div>
+
+        <label className="switch">
+          <div>
+            <div className="title">Reduce motion</div>
+            <div className="desc">Turns off hover lifts, slide-ins and the picker roulette.</div>
+          </div>
+          <input type="checkbox" checked={motion === 'reduced'} onChange={(e) => setMotion(e.target.checked ? 'reduced' : 'full')} />
+        </label>
       </div>
     </>
   )

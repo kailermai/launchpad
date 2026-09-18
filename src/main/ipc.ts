@@ -14,6 +14,9 @@ interface Context {
   getWindow: () => BrowserWindow | null
 }
 
+/** Height of the custom title bar; must match --titlebar-h in the renderer. */
+export const TITLEBAR_HEIGHT = 40
+
 /**
  * The complete list of things the UI can ask the main process to do.
  * Every handler checks the request came from our own window and validates
@@ -92,4 +95,11 @@ export function registerIpc(ctx: Context): void {
   // misc
   handle(IPC.getAppInfo, (): AppInfo => ({ version: app.getVersion(), dataDir: getPaths().dataDir }))
   handle(IPC.openDataFolder, () => openDataFolder())
+  handle(IPC.setTitleBarColors, (e, color, symbolColor) => {
+    const HEX = /^#[0-9a-f]{6}$/i
+    if (typeof color !== 'string' || typeof symbolColor !== 'string' || !HEX.test(color) || !HEX.test(symbolColor)) {
+      throw new Error('Invalid colour.')
+    }
+    requireWindow(e).setTitleBarOverlay({ color, symbolColor, height: TITLEBAR_HEIGHT })
+  })
 }

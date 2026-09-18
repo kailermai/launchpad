@@ -14,14 +14,19 @@ export function relativeTime(iso: string | null): string {
   return new Date(iso).toLocaleDateString()
 }
 
-/** Deterministic gradient for cover-less entries so every card has a distinct tile. */
-export function gradientFor(name: string): string {
+/**
+ * Deterministic gradient for cover-less entries. Hues stay within ±32° of the
+ * theme's base hue so the shelf reads as one family rather than a rainbow,
+ * while each name still gets its own tint.
+ */
+export function gradientFor(name: string, baseHue = 262): string {
   let hash = 2166136261
   for (let i = 0; i < name.length; i++) hash = Math.imul(hash ^ name.charCodeAt(i), 16777619)
-  // Golden-angle spacing keeps neighbouring names visually distinct.
-  const hue = Math.round((Math.abs(hash) * 137.508) % 360)
-  const hue2 = (hue + 40) % 360
-  return `linear-gradient(160deg, hsl(${hue} 55% 34%), hsl(${hue2} 60% 18%))`
+  const spread = (Math.abs(hash) % 65) - 32
+  const hue = (baseHue + spread + 360) % 360
+  const hue2 = (hue + 28) % 360
+  const sat = 42 + (Math.abs(hash >> 8) % 14)
+  return `linear-gradient(160deg, hsl(${hue} ${sat}% 36%), hsl(${hue2} ${sat + 8}% 17%))`
 }
 
 export function initials(name: string): string {
