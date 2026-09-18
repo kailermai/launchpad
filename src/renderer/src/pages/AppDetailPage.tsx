@@ -10,10 +10,16 @@ import { gradientFor, LAUNCH_TYPE_LABEL, relativeTime } from '@/utils/format'
 
 export function AppDetailPage(): JSX.Element {
   const { id } = useParams()
-  const { apps, loaded, platformName, categoryName, launch, toggleFavorite, openEdit, openRemove, setModal } = useLibrary()
+  const { apps, loaded, platformName, categoryName, launch, toggleFavorite, openEdit, openRemove, setModal, setDetailApp } = useLibrary()
   const { tileHue } = useAppearance()
   const app = apps.find((a) => a.id === id)
   const [status, setStatus] = useState<TargetStatus | null>(null)
+
+  // Let a dropped / pasted image set this entry's cover while the page is open.
+  useEffect(() => {
+    setDetailApp(app ?? null)
+    return () => setDetailApp(null)
+  }, [app, setDetailApp])
 
   useEffect(() => {
     if (!app) return
@@ -66,7 +72,12 @@ export function AppDetailPage(): JSX.Element {
         <IconArrowLeft /> Library
       </Link>
       <div className="detail">
-        <CoverImage app={app} showFavorite={false} />
+        <div>
+          <CoverImage app={app} showFavorite={false} />
+          <div className="muted" style={{ fontSize: 12, textAlign: 'center', marginTop: 10 }}>
+            Drop or paste an image to set the cover
+          </div>
+        </div>
         <div>
           <h1>{app.name}</h1>
           <div className="badges">

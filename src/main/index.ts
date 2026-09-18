@@ -2,8 +2,10 @@ import { app, BrowserWindow, Menu, net, protocol, session } from 'electron'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { dataDirOverride, initialRoute, renderIcon, renderIconPath, scheduleScreenshot, screenshotPath } from './capture'
+import { sweepOrphanAssets } from './apps'
 import { Store } from './db'
 import { registerIpc, TITLEBAR_HEIGHT } from './ipc'
+import { loadWindowState, MIN_HEIGHT, MIN_WIDTH, trackWindowState } from './windowState'
 import { configureUserData, getPaths, resolveInsideAssets } from './paths'
 import { isSmokeRun, smokeMain } from './smoke'
 
@@ -48,11 +50,15 @@ function registerCoverProtocol(): void {
 }
 
 function createWindow(): void {
+  const stateFile = path.join(getPaths().dataDir, 'window-state.json')
+  const state = loadWindowState(stateFile)
   const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 600,
+    width: state.width,
+    height: state.height,
+    x: state.x,
+    y: state.y,
+    minWidth: MIN_WIDTH,
+    minHeight: MIN_HEIGHT,
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0b0912',
@@ -72,6 +78,8 @@ function createWindow(): void {
     }
   })
   mainWindow = win
+  if (state.maximized) win.maximize()
+  trackWindowState(win, stateFile)
 
   win.once('ready-to-show', () => win.show())
   win.on('closed', () => {
@@ -126,6 +134,7 @@ app.whenReady().then(async () => {
   const { dbFile } = getPaths()
   const store = await Store.open(dbFile)
   registerIpc({ store, getWindow: () => mainWindow })
+  void sweepOrphanAssets(store) // tidy our own assets folder; never touches anything else
 
   createWindow()
 

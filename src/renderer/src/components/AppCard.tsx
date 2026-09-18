@@ -5,17 +5,39 @@ import { useGridNavigation } from '@/hooks/useGridNavigation'
 import { useLibrary } from '@/store/LibraryContext'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 import { CoverImage } from './CoverImage'
-import { IconEdit, IconPlay, IconStar, IconStarFilled, IconTrash } from './Icons'
+import { IconCheck, IconEdit, IconPlay, IconStar, IconStarFilled, IconTrash } from './Icons'
 
-export function AppCard({ app }: { app: Application }): JSX.Element {
+export interface SelectMods {
+  toggle: boolean
+  range: boolean
+}
+
+interface CardProps {
+  app: Application
+  selected?: boolean
+  /** Ctrl/Shift-click (or Space) — when provided, the card supports multi-select. */
+  onSelect?: (app: Application, mods: SelectMods) => void
+}
+
+export function AppCard({ app, selected = false, onSelect }: CardProps): JSX.Element {
   const navigate = useNavigate()
-  const { platformName, categoryName, launch, toggleFavorite, openEdit, openRemove } = useLibrary()
+  const { platformName, categoryName, launch, toggleFavorite, openEdit, openRemove, missingIds } = useLibrary()
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const platform = platformName(app.platformId)
   const category = categoryName(app.categoryId)
+  const missing = missingIds.has(app.id)
 
   const open = (): void => {
     void navigate(`/library/${app.id}`)
+  }
+
+  const onClick = (e: MouseEvent<HTMLDivElement>): void => {
+    if (onSelect && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+      e.preventDefault()
+      onSelect(app, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey })
+      return
+    }
+    open()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
@@ -26,6 +48,9 @@ export function AppCard({ app }: { app: Application }): JSX.Element {
     } else if (e.key === 'Enter') {
       e.preventDefault()
       open()
+    } else if (e.key === ' ' && onSelect) {
+      e.preventDefault()
+      onSelect(app, { toggle: true, range: e.shiftKey })
     } else if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault()
       void toggleFavorite(app)
@@ -49,19 +74,30 @@ export function AppCard({ app }: { app: Application }): JSX.Element {
       onSelect: () => void toggleFavorite(app),
       kbd: 'F'
     },
+    ...(onSelect
+      ? [
+          {
+            label: selected ? 'Deselect' : 'Select',
+            icon: <IconCheck />,
+            onSelect: () => onSelect(app, { toggle: true, range: false }),
+            kbd: 'Space'
+          }
+        ]
+      : []),
     { label: 'Edit…', icon: <IconEdit />, onSelect: () => openEdit(app), separatorBefore: true },
     { label: 'Remove from Library…', icon: <IconTrash />, onSelect: () => openRemove(app), danger: true }
   ]
 
   return (
     <div
-      className={`card ${menu ? 'menu-open' : ''}`}
+      className={`card ${menu ? 'menu-open' : ''} ${selected ? 'selected' : ''} ${missing ? 'missing' : ''}`}
       role="link"
       tabIndex={-1}
       data-nav-item
       data-app-id={app.id}
       aria-label={app.name}
-      onClick={open}
+      aria-selected={onSelect ? selected : undefined}
+      onClick={onClick}
       onKeyDown={onKeyDown}
       onContextMenu={onContextMenu}
     >
@@ -98,12 +134,22 @@ export function AppCard({ app }: { app: Application }): JSX.Element {
           </>
         }
       />
+      {selected && (
+        <span className="select-mark" aria-hidden="true">
+          <IconCheck size={14} />
+        </span>
+      )}
       <div className="meta">
         <div className="name" title={app.name}>
           {app.name}
         </div>
-        {(platform || category) && (
+        {(platform || category || missing) && (
           <div className="badges">
+            {missing && (
+              <span className="badge warn" title="The file this entry points at could not be found">
+                ⚠ Missing
+              </span>
+            )}
             {platform && <span className="badge accent">{platform}</span>}
             {category && <span className="badge">{category}</span>}
           </div>
@@ -119,15 +165,17 @@ interface GridProps {
   /** `row` renders a horizontally scrolling strip instead of a wrapping grid. */
   variant?: 'grid' | 'row'
   label?: string
+  selectedIds?: Set<string>
+  onSelect?: (app: Application, mods: SelectMods) => void
 }
 
-export function AppGrid({ apps, variant = 'grid', label }: GridProps): JSX.Element {
+export function AppGrid({ apps, variant = 'grid', label, selectedIds, onSelect }: GridProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   useGridNavigation(ref)
   return (
     <div ref={ref} className={variant === 'row' ? 'row-scroll' : 'grid'} role="list" aria-label={label}>
       {apps.map((app) => (
-        <AppCard key={app.id} app={app} />
+        <AppCard key={app.id} app={app} selected={selectedIds?.has(app.id) ?? false} onSelect={onSelect} />
       ))}
     </div>
   )

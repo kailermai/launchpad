@@ -3,7 +3,9 @@ export const IPC = {
   getApplication: 'apps:get',
   addApplication: 'apps:add',
   updateApplication: 'apps:update',
-  removeApplication: 'apps:remove',
+  removeApplications: 'apps:remove',
+  restoreApplications: 'apps:restore',
+  bulkUpdateApplications: 'apps:bulkUpdate',
   setFavorite: 'apps:favorite',
   launchApplication: 'apps:launch',
   checkApplicationTarget: 'apps:checkTarget',
@@ -13,6 +15,8 @@ export const IPC = {
   chooseApplicationFile: 'files:chooseApplication',
   readDroppedFileMetadata: 'files:droppedMetadata',
   chooseCoverImage: 'files:chooseCover',
+  importCoverFromPath: 'files:importCoverPath',
+  importCoverFromBytes: 'files:importCoverBytes',
 
   listPlatforms: 'platforms:list',
   savePlatform: 'platforms:save',
@@ -33,7 +37,8 @@ export const IPC = {
 
   getAppInfo: 'app:info',
   openDataFolder: 'app:openDataFolder',
-  setTitleBarColors: 'app:titleBarColors'
+  setTitleBarColors: 'app:titleBarColors',
+  minimizeWindow: 'app:minimize'
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

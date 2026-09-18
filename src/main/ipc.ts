@@ -1,10 +1,24 @@
 import { app, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { IPC, type IpcChannel } from '../shared/ipc'
 import type { AppInfo } from '../shared/types'
-import { addApplication, refreshIcons, removeApplication, updateApplication } from './apps'
+import {
+  addApplication,
+  bulkUpdateApplications,
+  refreshIcons,
+  removeApplications,
+  restoreApplications,
+  updateApplication
+} from './apps'
 import { importBackup, exportBackup, inspectBackup } from './backup'
 import type { Store } from './db'
-import { chooseApplicationFile, chooseCoverImage, openDataFolder, readDroppedFileMetadata } from './files'
+import {
+  chooseApplicationFile,
+  chooseCoverImage,
+  importCoverFromBytes,
+  importDroppedCover,
+  openDataFolder,
+  readDroppedFileMetadata
+} from './files'
 import { checkAllTargets, checkTarget, launchApplication } from './launch'
 import { getPaths } from './paths'
 import { assertId, assertIdList, validateLabel } from './validate'
@@ -43,7 +57,9 @@ export function registerIpc(ctx: Context): void {
   handle(IPC.getApplication, (_e, id) => store.getApplication(assertId(id)))
   handle(IPC.addApplication, (_e, input) => addApplication(store, input))
   handle(IPC.updateApplication, (_e, id, input) => updateApplication(store, assertId(id), input))
-  handle(IPC.removeApplication, (_e, id) => removeApplication(store, assertId(id)))
+  handle(IPC.removeApplications, (_e, ids) => removeApplications(store, ids))
+  handle(IPC.restoreApplications, (_e, ids) => restoreApplications(store, ids))
+  handle(IPC.bulkUpdateApplications, (_e, ids, patch) => bulkUpdateApplications(store, ids, patch))
   handle(IPC.setFavorite, (_e, id, favorite) => store.setFavorite(assertId(id), Boolean(favorite)))
   handle(IPC.launchApplication, (_e, id) => launchApplication(store, assertId(id)))
   handle(IPC.refreshIcons, () => refreshIcons(store))
@@ -58,6 +74,8 @@ export function registerIpc(ctx: Context): void {
   handle(IPC.chooseApplicationFile, (e) => chooseApplicationFile(requireWindow(e)))
   handle(IPC.readDroppedFileMetadata, (_e, filePath) => readDroppedFileMetadata(filePath))
   handle(IPC.chooseCoverImage, (e) => chooseCoverImage(requireWindow(e)))
+  handle(IPC.importCoverFromPath, (_e, filePath) => importDroppedCover(filePath))
+  handle(IPC.importCoverFromBytes, (_e, bytes) => importCoverFromBytes(bytes))
 
   // platforms / categories
   const labelInput = (raw: unknown): { id?: string; name: string } => {
@@ -102,4 +120,5 @@ export function registerIpc(ctx: Context): void {
     }
     requireWindow(e).setTitleBarOverlay({ color, symbolColor, height: TITLEBAR_HEIGHT })
   })
+  handle(IPC.minimizeWindow, (e) => requireWindow(e).minimize())
 }

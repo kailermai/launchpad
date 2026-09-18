@@ -13,7 +13,9 @@ const api: LauncherApi = {
   getApplication: (id) => invoke(IPC.getApplication, id),
   addApplication: (input) => invoke(IPC.addApplication, input),
   updateApplication: (id, input) => invoke(IPC.updateApplication, id, input),
-  removeApplication: (id) => invoke(IPC.removeApplication, id),
+  removeApplications: (ids) => invoke(IPC.removeApplications, ids),
+  restoreApplications: (ids) => invoke(IPC.restoreApplications, ids),
+  bulkUpdateApplications: (ids, patch) => invoke(IPC.bulkUpdateApplications, ids, patch),
   setFavorite: (id, favorite) => invoke(IPC.setFavorite, id, favorite),
   launchApplication: (id) => invoke(IPC.launchApplication, id),
   checkApplicationTarget: (id) => invoke(IPC.checkApplicationTarget, id),
@@ -23,6 +25,8 @@ const api: LauncherApi = {
   chooseApplicationFile: () => invoke(IPC.chooseApplicationFile),
   readDroppedFileMetadata: (path) => invoke(IPC.readDroppedFileMetadata, path),
   chooseCoverImage: () => invoke(IPC.chooseCoverImage),
+  importCoverFromPath: (path) => invoke(IPC.importCoverFromPath, path),
+  importCoverFromBytes: (bytes) => invoke(IPC.importCoverFromBytes, bytes),
   getPathForFile: (file) => webUtils.getPathForFile(file),
 
   listPlatforms: () => invoke(IPC.listPlatforms),
@@ -44,7 +48,8 @@ const api: LauncherApi = {
 
   getAppInfo: () => invoke(IPC.getAppInfo),
   openDataFolder: () => invoke(IPC.openDataFolder),
-  setTitleBarColors: (color, symbolColor) => invoke(IPC.setTitleBarColors, color, symbolColor)
+  setTitleBarColors: (color, symbolColor) => invoke(IPC.setTitleBarColors, color, symbolColor),
+  minimizeWindow: () => invoke(IPC.minimizeWindow)
 }
 
 contextBridge.exposeInMainWorld('launcher', api)

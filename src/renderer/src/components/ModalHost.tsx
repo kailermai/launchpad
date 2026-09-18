@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '@/api'
 import { useLibrary } from '@/store/LibraryContext'
 import { AppFormModal } from './AppFormModal'
@@ -6,8 +6,9 @@ import { ConfirmModal, Modal } from './Modal'
 
 /** Renders whichever modal the library context currently wants open. */
 export function ModalHost(): JSX.Element | null {
-  const { modal, setModal, refresh, toast, launch } = useLibrary()
+  const { modal, setModal, refresh, toast, launch, removeWithUndo } = useLibrary()
   const navigate = useNavigate()
+  const location = useLocation()
   const close = (): void => setModal(null)
 
   if (!modal) return null
@@ -26,16 +27,44 @@ export function ModalHost(): JSX.Element | null {
         onCancel={close}
         onConfirm={() => {
           void (async () => {
-            await api.removeApplication(app.id)
-            await refresh()
             close()
-            toast(`${app.name} removed from your library.`)
-            navigate('/library')
+            if (location.pathname === `/library/${app.id}`) navigate('/library')
+            await removeWithUndo([app])
           })()
         }}
       >
         <p>
-          This only removes the launcher entry. <strong>The application and its files will not be modified.</strong>
+          This only removes the launcher entry — you can undo it for a few seconds afterwards.{' '}
+          <strong>The application and its files will not be modified.</strong>
+        </p>
+      </ConfirmModal>
+    )
+  }
+
+  if (modal.type === 'bulkRemove') {
+    const { apps } = modal
+    return (
+      <ConfirmModal
+        title={`Remove ${apps.length} entries from your launcher?`}
+        confirmLabel={`Remove ${apps.length} from Library`}
+        danger
+        onCancel={close}
+        onConfirm={() => {
+          void (async () => {
+            close()
+            await removeWithUndo(apps)
+          })()
+        }}
+      >
+        <p>
+          {apps
+            .slice(0, 6)
+            .map((a) => a.name)
+            .join(', ')}
+          {apps.length > 6 ? ` and ${apps.length - 6} more` : ''}
+        </p>
+        <p>
+          Only launcher entries are removed (undo is offered afterwards). <strong>No files on disk are touched.</strong>
         </p>
       </ConfirmModal>
     )

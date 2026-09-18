@@ -9,7 +9,12 @@ export function Toasts(): JSX.Element {
       {toasts.map((t) => (
         <div key={t.id} className={`toast ${t.kind}`} style={{ '--toast-ms': `${t.ms}ms` } as CSSProperties}>
           <span className="toast-icon">{t.kind === 'success' ? <IconCheck /> : t.kind === 'error' ? <IconAlert /> : <IconInfo />}</span>
-          <span>{t.message}</span>
+          <span className="toast-body">{t.message}</span>
+          {t.action && (
+            <button type="button" className="btn sm toast-action" onClick={t.action.run}>
+              {t.action.label}
+            </button>
+          )}
           <span className="toast-bar" />
         </div>
       ))}

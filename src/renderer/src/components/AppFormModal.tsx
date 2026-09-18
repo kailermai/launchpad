@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Application, ApplicationInput, DroppedFileMeta, LaunchType } from '@shared/types'
 import { api, assetUrl } from '@/api'
@@ -13,7 +13,7 @@ interface Props {
 
 /** Add / Edit Application. Same form for both; the main process validates everything again. */
 export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
-  const { platforms, categories, refresh, toast, setModal } = useLibrary()
+  const { platforms, categories, refresh, toast, setModal, incomingCover, clearIncomingCover } = useLibrary()
   const navigate = useNavigate()
 
   const [name, setName] = useState(app?.name ?? prefill?.suggestedName ?? '')
@@ -28,6 +28,13 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
   const [busy, setBusy] = useState(false)
 
   const isFile = launchType !== 'uri'
+
+  // An image dropped onto the window or pasted while this form is open becomes the cover.
+  useEffect(() => {
+    if (!incomingCover) return
+    setCoverPath(incomingCover.fileName)
+    clearIncomingCover()
+  }, [incomingCover, clearIncomingCover])
 
   const browse = async (): Promise<void> => {
     const meta = await api.chooseApplicationFile()
@@ -167,7 +174,10 @@ export function AppFormModal({ app, prefill, onClose }: Props): JSX.Element {
               )}
             </div>
           </div>
-          <div className="hint">PNG, JPG or WEBP. A copy is kept in the launcher's own folder; the original is untouched.</div>
+          <div className="hint">
+            PNG, JPG or WEBP — choose a file, paste an image (Ctrl+V) or drop one onto the window. A copy is kept in the launcher's own
+            folder; the original is untouched.
+          </div>
         </div>
 
         <label className="checkbox">

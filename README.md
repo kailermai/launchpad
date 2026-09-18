@@ -15,7 +15,11 @@ goes online.
 - Recently launched (tracked only when you press Play here)
 - Random picker with saved presets ("Chill", "Multiplayer", …) and three styles: Quick shuffle, Slot machine, Roulette wheel
 - JSON backup export / restore (merge or replace)
-- Library Health: find entries whose files no longer exist
+- Library Health: find entries whose files no longer exist; missing entries are also badged in the library (read-only check on load, can be turned off)
+- Remove from Library is undoable for a few seconds (the launcher's own image copies are kept until the undo window closes)
+- Multi-select in the Library (Ctrl-click / Shift-click / Space, "Select all") with bulk favourite / platform / category / remove
+- Covers: choose a file, paste an image with Ctrl+V, or drop one onto the window while an entry or the Add form is open
+- Optional "minimise after launch"; window size/position/maximised state are remembered
 - Appearance: three purple palettes (Violet Night, Plum & Gold, Synthwave), grid density, reduce motion — Settings → Appearance
 - Keyboard: `Ctrl K` search · `Ctrl N` add · `Ctrl R` random picker · `Esc` close · arrow keys move between cards · `Enter` open · `Ctrl Enter` play · `F` favourite · right-click a card for its menu
 
@@ -65,7 +69,8 @@ src/renderer/   React UI (styles/tokens.css holds the three palettes)
 Data lives in `%APPDATA%\Launchpad\` (an existing `%APPDATA%\PersonalLauncher\` folder from older builds is renamed in place on first start):
 
 ```
-launcher.db     SQLite database (written atomically)
-assets/         copied covers and extracted icons, UUID-named
-snapshots/      automatic copies of launcher.db taken before a "Replace" restore
+launcher.db        SQLite database (written atomically)
+assets/            copied covers and extracted icons, UUID-named (unreferenced ones older than an hour are swept at startup)
+snapshots/         automatic copies of launcher.db taken before a "Replace" restore
+window-state.json  last window size / position
 ```

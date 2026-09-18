@@ -5,6 +5,7 @@ import { api } from '@/api'
 import { ConfirmModal } from '@/components/Modal'
 import { useLibrary } from '@/store/LibraryContext'
 import { useAppearance, type ThemeInfo } from '@/store/AppearanceContext'
+import { usePrefs } from '@/store/PrefsContext'
 import { useNavigate } from 'react-router-dom'
 
 export function SettingsPage(): JSX.Element {
@@ -55,6 +56,7 @@ export function SettingsPage(): JSX.Element {
 
 function GeneralSettings(): JSX.Element {
   const { refresh, toast } = useLibrary()
+  const { prefs, setPref } = usePrefs()
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   useEffect(() => {
@@ -78,6 +80,26 @@ function GeneralSettings(): JSX.Element {
     <>
       <h2>General</h2>
       <p className="lead">Launchpad {info?.version ?? ''} — a shelf for everything you choose to launch.</p>
+
+      <h2 className="sub" style={{ marginTop: 0 }}>
+        Behaviour
+      </h2>
+      <div className="setting-group">
+        <label className="switch">
+          <div>
+            <div className="title">Minimise after launch</div>
+            <div className="desc">Get the launcher out of the way as soon as something starts.</div>
+          </div>
+          <input type="checkbox" checked={prefs.minimizeAfterLaunch} onChange={(e) => setPref('minimizeAfterLaunch', e.target.checked)} />
+        </label>
+        <label className="switch">
+          <div>
+            <div className="title">Flag entries whose file is missing</div>
+            <div className="desc">Checks each entry's file still exists when the library loads (read-only) and badges the ones that don't.</div>
+          </div>
+          <input type="checkbox" checked={prefs.flagMissing} onChange={(e) => setPref('flagMissing', e.target.checked)} />
+        </label>
+      </div>
 
       <div className="callout" style={{ marginBottom: 20 }}>
         <div>
@@ -134,8 +156,13 @@ function GeneralSettings(): JSX.Element {
           ['Ctrl K', 'Focus search'],
           ['Ctrl N', 'Add application'],
           ['Ctrl R', 'Open random picker'],
-          ['Esc', 'Close dialog / clear search'],
-          ['Enter', 'Activate focused item']
+          ['Ctrl V', 'Paste an image as the cover (entry or Add form open)'],
+          ['← → ↑ ↓', 'Move between cards'],
+          ['Enter', 'Open the focused card'],
+          ['Ctrl Enter', 'Play the focused card'],
+          ['F', 'Toggle favourite on the focused card'],
+          ['Space / Ctrl-click / Shift-click', 'Select cards (Library)'],
+          ['Esc', 'Close dialog / clear search / clear selection']
         ].map(([k, d]) => (
           <div key={k} className="list-row" style={{ padding: '8px 14px' }}>
             <span className="kbd">{k}</span>
@@ -350,7 +377,7 @@ function LabelManager({ kind }: { kind: 'platforms' | 'categories' }): JSX.Eleme
 // ---- Library Health ---------------------------------------------------------------
 
 function HealthSettings(): JSX.Element {
-  const { apps, refresh, toast, setModal } = useLibrary()
+  const { apps, toast, setModal, removeWithUndo } = useLibrary()
   const navigate = useNavigate()
   const [missing, setMissing] = useState<MissingTarget[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -432,11 +459,10 @@ function HealthSettings(): JSX.Element {
           onCancel={() => setRemoving(null)}
           onConfirm={() => {
             void (async () => {
-              await api.removeApplication(removing.id)
-              await refresh()
-              setMissing((list) => (list ? list.filter((m) => m.id !== removing.id) : list))
+              const app = apps.find((a) => a.id === removing.id)
               setRemoving(null)
-              toast(`${removing.name} removed from your library.`)
+              setMissing((list) => (list ? list.filter((m) => m.id !== removing.id) : list))
+              if (app) await removeWithUndo([app])
             })()
           }}
         >

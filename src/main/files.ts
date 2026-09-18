@@ -137,19 +137,50 @@ export async function chooseApplicationFile(win: BrowserWindow): Promise<Dropped
 
 type ImageKind = 'png' | 'jpg' | 'webp'
 
+/** Identifies PNG / JPEG / WEBP from the first bytes; anything else (including SVG) is rejected. */
+export function sniffImageBytes(buf: Buffer): ImageKind | null {
+  if (buf.length < 12) return null
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png'
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
+  if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp'
+  return null
+}
+
 async function sniffImage(filePath: string): Promise<ImageKind | null> {
   const handle = await fs.promises.open(filePath, 'r')
   try {
     const buf = Buffer.alloc(12)
     const { bytesRead } = await handle.read(buf, 0, 12, 0)
-    if (bytesRead < 12) return null
-    if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png'
-    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
-    if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp'
-    return null
+    return sniffImageBytes(buf.subarray(0, bytesRead))
   } finally {
     await handle.close()
   }
+}
+
+const COVER_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
+
+/** An image file the user dropped onto the window: validated like a dialog pick, then copied in. */
+export async function importDroppedCover(filePath: unknown): Promise<string | null> {
+  if (typeof filePath !== 'string' || !path.isAbsolute(filePath) || filePath.includes('\0')) return null
+  if (!COVER_EXTENSIONS.has(path.extname(filePath).toLowerCase())) return null
+  try {
+    return await importCoverFromPath(filePath)
+  } catch {
+    return null
+  }
+}
+
+/** Image bytes pasted from the clipboard. Stored only if they really are a PNG / JPEG / WEBP. */
+export async function importCoverFromBytes(bytes: unknown): Promise<string | null> {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 || bytes.byteLength > MAX_COVER_BYTES) return null
+  const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const kind = sniffImageBytes(buf)
+  if (!kind) return null
+  const fileName = `${randomUUID()}.${kind}`
+  const dest = resolveInsideAssets(fileName)
+  if (!dest) return null
+  await fs.promises.writeFile(dest, buf, { flag: 'wx' })
+  return fileName
 }
 
 /** Copies a user-chosen image into the assets folder. The original is never touched. */

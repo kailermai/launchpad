@@ -123,6 +123,11 @@
   border-color: transparent;
   color: var(--accent-strong);
 }
+.badge.warn {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
 
 .chip {
   display: inline-flex;
@@ -434,6 +439,28 @@ select.input option {
   gap: 6px;
   margin-top: 5px;
   flex-wrap: wrap;
+}
+.card.selected .cover {
+  box-shadow: 0 0 0 3px var(--accent-strong), 0 0 24px var(--accent-glow);
+}
+.card .select-mark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  animation: pop var(--dur-1) var(--ease);
+}
+.card.missing .cover {
+  filter: saturate(0.35) brightness(0.65);
 }
 
 .cover {
@@ -795,6 +822,22 @@ select.input option {
   margin-top: 2px;
   color: var(--accent-strong);
 }
+.toast .toast-body {
+  flex: 1;
+  min-width: 0;
+}
+.toast .toast-action {
+  margin-left: 4px;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+.toast .toast-action:hover {
+  background: var(--accent);
+  color: #fff;
+}
 .toast.success .toast-icon {
   color: var(--success);
 }
@@ -893,6 +936,44 @@ select.input option {
 .drop-overlay .box p {
   margin: 0;
   color: var(--muted);
+}
+
+/* ---- bulk action bar ------------------------------------------------------------------- */
+
+.bulk-bar {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 40;
+}
+.bulk-bar-inner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 18px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
+  animation: rise var(--dur-3) var(--ease);
+  max-width: calc(100% - 48px);
+  flex-wrap: wrap;
+}
+.bulk-bar-inner .count {
+  font-weight: 700;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.bulk-bar-inner select.input {
+  width: auto;
+  padding: 6px 30px 6px 10px;
+  font-size: 13px;
+  border-radius: 8px;
 }
 
 /* ---- stats / theme swatches ------------------------------------------------------------- */

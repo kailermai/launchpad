@@ -2,14 +2,15 @@ import { app, shell } from 'electron'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import { addApplication, refreshIcons, removeApplication, updateApplication } from './apps'
+import { addApplication, bulkUpdateApplications, flushTrash, refreshIcons, removeApplications, restoreApplications, sweepOrphanAssets, updateApplication } from './apps'
 import { importBackup, loadBackupFile } from './backup'
 import { Store } from './db'
-import { cleanDisplayName, extractIcon, readDroppedFileMetadata } from './files'
+import { cleanDisplayName, extractIcon, importCoverFromBytes, importDroppedCover, readDroppedFileMetadata } from './files'
 import { extractLargestIcon } from './icons'
 import { checkAllTargets, checkTarget } from './launch'
 import { getPaths, resolveDataDir, resolveInsideAssets } from './paths'
 import { validateLaunchTarget } from './validate'
+import { sanitizeWindowState } from './windowState'
 
 /**
  * `electron . --smoke` — exercises the backend against a throwaway data folder
@@ -141,14 +142,74 @@ export async function runSmoke(): Promise<void> {
   assert.equal((await checkTarget(missing.application)).exists, false)
   ok('target existence check')
 
+  // --- remove is undoable: assets stay until the window closes; restore brings preset membership back ---
+  const undoApp = await addApplication(store, { name: 'Undo Me', launchType: 'executable', launchTarget: 'C:\\Windows\\explorer.exe' })
+  assert.ok(undoApp.ok)
+  const undoId = undoApp.application.id
+  const undoIcon = undoApp.application.iconPath!
+  const undoPreset = store.savePreset({ name: 'Undo', applicationIds: [undoId] })
+  assert.equal(await removeApplications(store, [undoId, 'not-an-id']), 1)
+  assert.equal(store.getApplication(undoId), null)
+  assert.ok(fs.existsSync(resolveInsideAssets(undoIcon)!)) // kept while undo is possible
+  const restoredApps = restoreApplications(store, [undoId])
+  assert.equal(restoredApps.length, 1)
+  assert.equal(restoredApps[0].id, undoId)
+  assert.equal(restoredApps[0].iconPath, undoIcon)
+  assert.deepEqual(store.listPresets().find((p) => p.id === undoPreset.id)!.applicationIds, [undoId])
+  store.deletePreset(undoPreset.id)
+  await removeApplications(store, [undoId])
+  await flushTrash(store)
+  assert.ok(!fs.existsSync(resolveInsideAssets(undoIcon)!))
+  assert.equal(restoreApplications(store, [undoId]).length, 0)
+  ok('remove is undoable; assets are only deleted once the undo window closes')
+
+  // --- pasted / dropped covers ---
+  const pngBytes = fs.readFileSync(resolveInsideAssets(store.getApplication(notepadApp.id)!.iconPath!)!)
+  const pasted = await importCoverFromBytes(new Uint8Array(pngBytes))
+  assert.ok(pasted && fs.existsSync(resolveInsideAssets(pasted)!))
+  assert.equal(await importCoverFromBytes(new Uint8Array(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'))), null)
+  assert.equal(await importCoverFromBytes('not bytes' as never), null)
+  assert.equal(await importDroppedCover('C:\\Windows\\win.ini'), null)
+  assert.equal(await importDroppedCover('relative.png'), null)
+  ok('pasted / dropped covers accepted only when they are real PNG/JPEG/WEBP')
+
+  // --- orphan sweep: only our own aged, unreferenced files ---
+  const orphan = resolveInsideAssets(pasted!)!
+  const past = new Date(Date.now() - 2 * 3600 * 1000)
+  fs.utimesSync(orphan, past, past)
+  assert.equal(await sweepOrphanAssets(store), 1)
+  assert.ok(!fs.existsSync(orphan))
+  ok('orphaned launcher assets older than an hour are swept')
+
+  // --- saved window bounds are validated against the displays ---
+  const displays = [{ x: 0, y: 0, width: 1920, height: 1080 }]
+  assert.deepEqual(sanitizeWindowState(null, displays), { width: 1280, height: 820, maximized: false })
+  assert.deepEqual(sanitizeWindowState({ x: 100, y: 50, width: 1000, height: 700, maximized: true }, displays), {
+    x: 100,
+    y: 50,
+    width: 1000,
+    height: 700,
+    maximized: true
+  })
+  assert.equal(sanitizeWindowState({ x: 5000, y: 5000, width: 1000, height: 700 }, displays).x, undefined)
+  assert.equal(sanitizeWindowState({ width: 10, height: 10 }, displays).width, 960)
+  ok('saved window bounds are validated against the displays')
+
   // --- foreign keys survive persist() (sql.js reopens on export) ---
   store.deleteLabel('platforms', steam.id)
   assert.equal(store.getApplication(notepadApp.id)!.platformId, null)
   ok('removing a platform nulls references instead of removing apps')
 
+  const epicId = store.findLabelByName('platforms', 'Epic')!.id
+  assert.equal(bulkUpdateApplications(store, [notepadApp.id, 'nope'], { favorite: false, platformId: epicId }), 1)
+  assert.equal(store.getApplication(notepadApp.id)!.platformId, epicId)
+  assert.equal(store.getApplication(notepadApp.id)!.favorite, false)
+  assert.equal(bulkUpdateApplications(store, [notepadApp.id], {}), 0)
+  ok('bulk update touches only the given fields')
+
   const preset = store.savePreset({ name: 'Chill', applicationIds: [notepadApp.id, missing.application.id] })
   assert.equal(preset.applicationIds.length, 2)
-  await removeApplication(store, missing.application.id)
+  await removeApplications(store, [missing.application.id])
   assert.equal(store.listPresets()[0].applicationIds.length, 1)
   assert.equal(store.getApplication(missing.application.id), null)
   ok('remove from library cascades out of presets')
@@ -171,7 +232,7 @@ export async function runSmoke(): Promise<void> {
   assert.ok(gone.ok)
   const audit = await checkAllTargets(store)
   assert.deepEqual(audit.map((m) => m.id), [gone.application.id])
-  await removeApplication(store, gone.application.id)
+  await removeApplications(store, [gone.application.id])
   ok('launch count increments; audit lists only missing targets')
 
   // --- persistence: reopen from disk ---
@@ -254,6 +315,13 @@ export async function runSmoke(): Promise<void> {
     categoryId: migrated.findLabelByName('categories', 'Game')?.id ?? null
   })
   assert.ok(steamDemo.ok && steamDemo.application.launchType === 'uri')
+  const goneDemo = await addApplication(migrated, {
+    name: 'Uninstalled Game',
+    launchType: 'executable',
+    launchTarget: 'C:\\Games\\Uninstalled\\game.exe',
+    categoryId: migrated.findLabelByName('categories', 'Game')?.id ?? null
+  })
+  assert.ok(goneDemo.ok)
   fs.unlinkSync(urlFile)
   fs.unlinkSync(backupFile)
 

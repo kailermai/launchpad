@@ -83,6 +83,8 @@ interface LabelRow {
 export type LabelTable = 'platforms' | 'categories'
 
 export interface NewApplication {
+  /** Only set when restoring a removed entry so it keeps its identity. */
+  id?: string
   name: string
   launchType: Application['launchType']
   launchTarget: string
@@ -241,7 +243,7 @@ export class Store {
   }
 
   insertApplication(input: NewApplication): Application {
-    const id = randomUUID()
+    const id = input.id ?? randomUUID()
     const ts = now()
     this.transaction(() => {
       this.run(
@@ -307,6 +309,28 @@ export class Store {
     this.transaction(() =>
       this.run('UPDATE applications SET favorite = ?, updated_at = ? WHERE id = ?', [favorite ? 1 : 0, now(), id])
     )
+  }
+
+  /** Changes only the given label/favourite fields on several entries. Returns how many existed. */
+  bulkUpdate(ids: string[], patch: { favorite?: boolean; platformId?: string | null; categoryId?: string | null }): number {
+    let count = 0
+    this.transaction(() => {
+      for (const id of ids) {
+        if (!this.getApplication(id)) continue
+        const ts = now()
+        if (patch.favorite !== undefined) {
+          this.run('UPDATE applications SET favorite = ?, updated_at = ? WHERE id = ?', [patch.favorite ? 1 : 0, ts, id])
+        }
+        if (patch.platformId !== undefined) {
+          this.run('UPDATE applications SET platform_id = ?, updated_at = ? WHERE id = ?', [this.existingId('platforms', patch.platformId), ts, id])
+        }
+        if (patch.categoryId !== undefined) {
+          this.run('UPDATE applications SET category_id = ?, updated_at = ? WHERE id = ?', [this.existingId('categories', patch.categoryId), ts, id])
+        }
+        count++
+      }
+    })
+    return count
   }
 
   markLaunched(id: string): void {
@@ -406,6 +430,20 @@ export class Store {
 
   deletePreset(id: string): void {
     this.transaction(() => this.run('DELETE FROM picker_presets WHERE id = ?', [id]))
+  }
+
+  presetsContaining(applicationId: string): string[] {
+    return this.all<{ preset_id: string }>('SELECT preset_id FROM picker_preset_items WHERE application_id = ?', [applicationId]).map(
+      (r) => r.preset_id
+    )
+  }
+
+  addPresetItem(presetId: string, applicationId: string): void {
+    this.transaction(() => {
+      const preset = this.get<{ id: string }>('SELECT id FROM picker_presets WHERE id = ?', [presetId])
+      if (!preset || !this.getApplication(applicationId)) return
+      this.run('INSERT OR IGNORE INTO picker_preset_items (preset_id, application_id) VALUES (?, ?)', [presetId, applicationId])
+    })
   }
 
   // ---- backup helpers ------------------------------------------------------

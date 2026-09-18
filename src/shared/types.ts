@@ -123,6 +123,13 @@ export interface AppInfo {
   dataDir: string
 }
 
+/** Fields that can be changed on many entries at once. Absent = unchanged. */
+export interface BulkPatch {
+  favorite?: boolean
+  platformId?: string | null
+  categoryId?: string | null
+}
+
 /** The complete native surface exposed to the UI. Nothing else exists. */
 export interface LauncherApi {
   // applications
@@ -130,7 +137,10 @@ export interface LauncherApi {
   getApplication(id: string): Promise<Application | null>
   addApplication(input: ApplicationInput): Promise<SaveResult>
   updateApplication(id: string, input: ApplicationInput): Promise<SaveResult>
-  removeApplication(id: string): Promise<void>
+  /** Removes launcher entries (database rows only). Undoable for a short while via restoreApplications. */
+  removeApplications(ids: string[]): Promise<number>
+  restoreApplications(ids: string[]): Promise<Application[]>
+  bulkUpdateApplications(ids: string[], patch: BulkPatch): Promise<number>
   setFavorite(id: string, favorite: boolean): Promise<void>
   launchApplication(id: string): Promise<LaunchResult>
   checkApplicationTarget(id: string): Promise<TargetStatus>
@@ -143,6 +153,10 @@ export interface LauncherApi {
   chooseApplicationFile(): Promise<DroppedFileMeta | null>
   readDroppedFileMetadata(path: string): Promise<DroppedFileMeta | null>
   chooseCoverImage(): Promise<string | null>
+  /** An image file dropped onto the window; validated and copied into the assets folder. */
+  importCoverFromPath(path: string): Promise<string | null>
+  /** Image bytes pasted from the clipboard; validated and stored in the assets folder. */
+  importCoverFromBytes(bytes: Uint8Array): Promise<string | null>
   /** Renderer-only helper: turns a dropped File into a path (no disk access). */
   getPathForFile(file: File): string
 
@@ -171,4 +185,6 @@ export interface LauncherApi {
   openDataFolder(): Promise<void>
   /** Recolours the native title-bar buttons to match the theme. Both values must be #rrggbb. */
   setTitleBarColors(color: string, symbolColor: string): Promise<void>
+  /** Minimises the launcher window (used by "minimise after launch"). */
+  minimizeWindow(): Promise<void>
 }
