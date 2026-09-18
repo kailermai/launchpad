@@ -13,6 +13,8 @@ export interface Toast {
   id: number
   message: string
   kind: 'info' | 'error' | 'success'
+  /** Auto-dismiss time, also drives the progress line. */
+  ms: number
 }
 
 interface LibraryValue {
@@ -67,8 +69,9 @@ export function LibraryProvider({ children }: { children: ReactNode }): JSX.Elem
 
   const toast = useCallback((message: string, kind: Toast['kind'] = 'info') => {
     const id = ++toastId.current
-    setToasts((t) => [...t, { id, message, kind }])
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 6000 : 3200)
+    const ms = kind === 'error' ? 6000 : 3200
+    setToasts((t) => [...t.slice(-2), { id, message, kind, ms }]) // at most three on screen
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ms)
   }, [])
 
   const platformName = useCallback(

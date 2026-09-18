@@ -15,7 +15,9 @@ goes online.
 - Recently launched (tracked only when you press Play here)
 - Random picker with saved presets ("Chill", "Multiplayer", …)
 - JSON backup export / restore (merge or replace)
-- Keyboard shortcuts: `Ctrl K` search · `Ctrl N` add · `Ctrl R` random picker · `Esc` close
+- Library Health: find entries whose files no longer exist
+- Appearance: three purple palettes (Violet Night, Plum & Gold, Synthwave), grid density, reduce motion — Settings → Appearance
+- Keyboard: `Ctrl K` search · `Ctrl N` add · `Ctrl R` random picker · `Esc` close · arrow keys move between cards · `Enter` open · `Ctrl Enter` play · `F` favourite · right-click a card for its menu
 
 ## What it deliberately cannot do
 
@@ -47,6 +49,7 @@ Dev-only flags (ignored in packaged builds):
 ```
 electron . --data-dir=<folder>         use another data folder
 electron . --route=random --screenshot=shot.png
+electron . --route="library?theme=plum" --screenshot=shot.png   (theme override; add=1 opens the Add dialog)
 electron . --render-icon=build/icon.png
 ```
 
@@ -56,7 +59,7 @@ electron . --render-icon=build/icon.png
 src/shared/     types + IPC channel names shared by both sides
 src/main/       Electron main process: store, validation, launching, files, backup, IPC
 src/preload/    the narrow contextBridge API (window.launcher)
-src/renderer/   React UI
+src/renderer/   React UI (styles/tokens.css holds the three palettes)
 ```
 
 Data lives in `%APPDATA%\PersonalLauncher\`:

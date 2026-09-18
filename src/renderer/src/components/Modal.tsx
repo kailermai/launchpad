@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { IconX } from './Icons'
 
 interface Props {
   title: string
@@ -19,7 +20,12 @@ export function Modal({ title, onClose, children, width }: Props): JSX.Element {
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined}>
-        <h2>{title}</h2>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button type="button" className="btn ghost icon-btn sm" onClick={onClose} aria-label="Close" title="Close (Esc)">
+            <IconX size={16} />
+          </button>
+        </div>
         {children}
       </div>
     </div>

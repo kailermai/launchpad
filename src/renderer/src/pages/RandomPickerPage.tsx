@@ -4,6 +4,8 @@ import type { Application } from '@shared/types'
 import { api } from '@/api'
 import { CoverImage, Thumb } from '@/components/CoverImage'
 import { EmptyState } from '@/components/EmptyState'
+import { IconDice, IconPlay, IconRefresh } from '@/components/Icons'
+import { useAppearance } from '@/store/AppearanceContext'
 import { useLibrary } from '@/store/LibraryContext'
 
 /** Cryptographically random index — no bias, no "it always picks the same one". */
@@ -15,13 +17,14 @@ function randomIndex(n: number): number {
 
 export function RandomPickerPage(): JSX.Element {
   const { apps, presets, loaded, launch, refresh, toast } = useLibrary()
+  const { motion } = useAppearance()
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
   const [presetName, setPresetName] = useState('')
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null)
   const [rolling, setRolling] = useState(false)
-  const [rollingName, setRollingName] = useState('')
+  const [rollingApp, setRollingApp] = useState<Application | null>(null)
   const [result, setResult] = useState<Application | null>(null)
   const timer = useRef<number | null>(null)
 
@@ -32,25 +35,36 @@ export function RandomPickerPage(): JSX.Element {
     return q ? apps.filter((a) => a.name.toLowerCase().includes(q)) : apps
   }, [apps, filter])
 
-  // Load a preset when arriving via /random?preset=<id>
+  const loadPreset = (id: string | null): void => {
+    const preset = id ? presets.find((p) => p.id === id) : undefined
+    if (!preset) {
+      setEditingPresetId(null)
+      setPresetName('')
+      return
+    }
+    setSelected(new Set(preset.applicationIds.filter((x) => appById.has(x))))
+    setPresetName(preset.name)
+    setEditingPresetId(preset.id)
+    setResult(null)
+  }
+
+  // Arriving via /random?preset=<id>
   useEffect(() => {
     const presetId = params.get('preset')
     if (!presetId || !loaded) return
-    const preset = presets.find((p) => p.id === presetId)
-    if (preset) {
-      setSelected(new Set(preset.applicationIds.filter((id) => appById.has(id))))
-      setPresetName(preset.name)
-      setEditingPresetId(preset.id)
-      setResult(null)
-    }
+    loadPreset(presetId)
     const next = new URLSearchParams(params)
     next.delete('preset')
     setParams(next, { replace: true })
-  }, [params, presets, loaded, appById, setParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, loaded])
 
-  useEffect(() => () => {
-    if (timer.current) window.clearTimeout(timer.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current)
+    },
+    []
+  )
 
   const toggle = (id: string): void => {
     setSelected((s) => {
@@ -63,18 +77,21 @@ export function RandomPickerPage(): JSX.Element {
 
   const pick = (exclude?: string): void => {
     const pool = candidates.filter((c) => candidates.length < 3 || c.id !== exclude)
-    if (pool.length < 2 && candidates.length < 2) return
-    setRolling(true)
+    if (pool.length === 0 || candidates.length < 2) return
     setResult(null)
+    if (motion === 'reduced') {
+      setResult(pool[randomIndex(pool.length)])
+      return
+    }
+    setRolling(true)
     const start = performance.now()
-    const duration = 1500
+    const duration = 1600
     const step = (): void => {
       const elapsed = performance.now() - start
-      setRollingName(pool[randomIndex(pool.length)].name)
+      setRollingApp(pool[randomIndex(pool.length)])
       if (elapsed < duration) {
-        // Ease out: ticks get slower as we approach the reveal.
         const t = elapsed / duration
-        timer.current = window.setTimeout(step, 50 + t * t * 260)
+        timer.current = window.setTimeout(step, 55 + t * t * 300) // ease out
       } else {
         setRolling(false)
         setResult(pool[randomIndex(pool.length)])
@@ -99,19 +116,6 @@ export function RandomPickerPage(): JSX.Element {
     }
   }
 
-  const loadPreset = (id: string): void => {
-    const preset = presets.find((p) => p.id === id)
-    if (!preset) {
-      setEditingPresetId(null)
-      setPresetName('')
-      return
-    }
-    setSelected(new Set(preset.applicationIds.filter((x) => appById.has(x))))
-    setPresetName(preset.name)
-    setEditingPresetId(preset.id)
-    setResult(null)
-  }
-
   if (!loaded) return <div />
   if (apps.length === 0) {
     return (
@@ -132,41 +136,42 @@ export function RandomPickerPage(): JSX.Element {
           <div className="sub">Tick the candidates, then let chance decide.</div>
         </div>
         <Link className="btn" to="/random/presets">
-          Saved presets ({presets.length})
+          Manage presets ({presets.length})
         </Link>
       </div>
 
       <div className="picker">
         <div>
+          {presets.length > 0 && (
+            <div className="chip-row" style={{ marginBottom: 14 }}>
+              {presets.map((p) => (
+                <button
+                  key={p.id}
+                  className={`chip sm ${editingPresetId === p.id ? 'active' : ''}`}
+                  onClick={() => loadPreset(editingPresetId === p.id ? null : p.id)}
+                >
+                  {p.name} <span className="faint">{p.applicationIds.length}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="filters">
-            <input className="input" style={{ maxWidth: 260 }} placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+            <input className="input" style={{ maxWidth: 240 }} placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} />
             <button className="btn sm" onClick={() => setSelected(new Set(apps.map((a) => a.id)))}>
               Select All
             </button>
             <button className="btn sm" onClick={() => setSelected(new Set())}>
               Clear
             </button>
-            <select
-              className="input"
-              value={editingPresetId ?? ''}
-              onChange={(e) => loadPreset(e.target.value)}
-              aria-label="Load preset"
-            >
-              <option value="">Load preset…</option>
-              {presets.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.applicationIds.length})
-                </option>
-              ))}
-            </select>
             <span className="result-count">{selected.size} selected</span>
           </div>
 
           <div className="candidates">
             {visible.map((app) => (
-              <label key={app.id} className="candidate">
+              <label key={app.id} className={`candidate ${selected.has(app.id) ? 'checked' : ''}`}>
                 <input type="checkbox" checked={selected.has(app.id)} onChange={() => toggle(app.id)} />
-                <Thumb app={app} />
+                <Thumb app={app} size="sm" />
                 <span>{app.name}</span>
               </label>
             ))}
@@ -177,14 +182,25 @@ export function RandomPickerPage(): JSX.Element {
           {result || rolling ? (
             <div className={`result ${result ? 'reveal' : ''}`}>
               <div className="eyebrow">{rolling ? 'Choosing…' : 'Tonight you should play'}</div>
-              {result && <CoverImage app={result} showFavorite={false} />}
-              <div className={`name ${rolling ? 'rolling' : ''}`}>{rolling ? rollingName : result?.name}</div>
+              {rolling && rollingApp ? (
+                <div className="roll">
+                  <Thumb app={rollingApp} size="lg" />
+                  <div className="name rolling">{rollingApp.name}</div>
+                </div>
+              ) : (
+                result && (
+                  <>
+                    <CoverImage app={result} showFavorite={false} />
+                    <div className="name">{result.name}</div>
+                  </>
+                )
+              )}
               <div className="buttons">
                 <button className="btn play lg" disabled={rolling} onClick={() => result && void launch(result)}>
-                  ▶ PLAY
+                  <IconPlay /> PLAY
                 </button>
                 <button className="btn lg" disabled={rolling} onClick={() => pick(result?.id)}>
-                  Reroll
+                  <IconRefresh /> Reroll
                 </button>
               </div>
             </div>
@@ -192,7 +208,7 @@ export function RandomPickerPage(): JSX.Element {
             <>
               <h3>Ready?</h3>
               <button className="btn primary lg block" disabled={candidates.length < 2} onClick={() => pick()}>
-                🎲 PICK FOR ME
+                <IconDice /> PICK FOR ME
               </button>
               <div className="muted" style={{ fontSize: 12, textAlign: 'center' }}>
                 {candidates.length < 2 ? 'Select at least two candidates.' : `Choosing from ${candidates.length} candidates.`}
@@ -203,20 +219,19 @@ export function RandomPickerPage(): JSX.Element {
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
             <h3 style={{ marginBottom: 10 }}>{editingPresetId ? 'Update preset' : 'Save as preset'}</h3>
             <div className="input-row">
-              <input className="input" placeholder="Preset name (e.g. Chill)" value={presetName} onChange={(e) => setPresetName(e.target.value)} maxLength={60} />
+              <input
+                className="input"
+                placeholder="Preset name (e.g. Chill)"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                maxLength={60}
+              />
               <button className="btn" disabled={selected.size === 0} onClick={() => void savePreset()}>
                 {editingPresetId ? 'Update' : 'Save'}
               </button>
             </div>
             {editingPresetId && (
-              <button
-                className="btn ghost sm"
-                style={{ marginTop: 8 }}
-                onClick={() => {
-                  setEditingPresetId(null)
-                  setPresetName('')
-                }}
-              >
+              <button className="btn ghost sm" style={{ marginTop: 8 }} onClick={() => loadPreset(null)}>
                 Save as a new preset instead
               </button>
             )}

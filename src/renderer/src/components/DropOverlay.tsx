@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api'
 import { useLibrary } from '@/store/LibraryContext'
+import { IconUpload } from './Icons'
 
 /**
  * Drag a .exe or .lnk from Explorer anywhere onto the window to add it.
@@ -69,6 +70,9 @@ export function DropOverlay(): JSX.Element | null {
   return (
     <div className="drop-overlay">
       <div className="box">
+        <div className="icon">
+          <IconUpload />
+        </div>
         <h2>DROP TO ADD</h2>
         <p>{label || 'Drop a .exe, .lnk or Steam .url shortcut to add it to your library'}</p>
       </div>

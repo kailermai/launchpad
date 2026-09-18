@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { Navigate, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom'
 import { DropOverlay } from '@/components/DropOverlay'
 import { ModalHost } from '@/components/ModalHost'
 import { Sidebar } from '@/components/Sidebar'
@@ -36,8 +36,22 @@ function useShortcuts(): void {
   }, [navigate, openAdd, modal])
 }
 
+/** `#/library?add=1` opens the Add dialog straight away (deep link; also used for screenshots). */
+function useAddDeepLink(): void {
+  const [params, setParams] = useSearchParams()
+  const { openAdd, loaded } = useLibrary()
+  useEffect(() => {
+    if (!loaded || params.get('add') !== '1') return
+    openAdd()
+    const next = new URLSearchParams(params)
+    next.delete('add')
+    setParams(next, { replace: true })
+  }, [params, loaded, openAdd, setParams])
+}
+
 export function App(): JSX.Element {
   useShortcuts()
+  useAddDeepLink()
   return (
     <div className="shell">
       <TopBar />

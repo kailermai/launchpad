@@ -1,7 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { AppCard, AppGrid } from '@/components/AppCard'
+import { AppGrid } from '@/components/AppCard'
 import { Thumb } from '@/components/CoverImage'
 import { EmptyState } from '@/components/EmptyState'
+import { HeroCard } from '@/components/HeroCard'
+import { IconDice, IconPlay, IconPlus } from '@/components/Icons'
 import { useLibrary } from '@/store/LibraryContext'
 import { relativeTime } from '@/utils/format'
 
@@ -15,11 +17,12 @@ export function HomePage(): JSX.Element {
   const recent = apps
     .filter((a) => a.lastLaunchedAt)
     .sort((a, b) => (b.lastLaunchedAt ?? '').localeCompare(a.lastLaunchedAt ?? ''))
-    .slice(0, 6)
   const mostPlayed = apps
     .filter((a) => a.launchCount > 0)
     .sort((a, b) => b.launchCount - a.launchCount || a.name.localeCompare(b.name))
-    .slice(0, 6)
+    .slice(0, 8)
+  const newest = [...apps].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const hero = recent[0] ?? favorites[0] ?? newest[0]
   const preview = apps.slice(0, 12)
 
   if (apps.length === 0) {
@@ -32,8 +35,9 @@ export function HomePage(): JSX.Element {
           </div>
         </div>
         <EmptyState
-          title="Drop a .exe or .lnk anywhere in this window"
-          text="Or add one manually. The launcher only ever knows about what you explicitly add — it never scans your PC."
+          title="Drop a game or app anywhere in this window"
+          text=".exe, .lnk or a Steam desktop shortcut. The launcher only ever knows about what you explicitly add — it never scans your PC."
+          art
         />
       </>
     )
@@ -48,37 +52,36 @@ export function HomePage(): JSX.Element {
             {apps.length} {apps.length === 1 ? 'entry' : 'entries'} on your shelf
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn" onClick={() => navigate('/random')}>
-            🎲 Pick something for me
+        <div className="actions">
+          <button className="btn" onClick={() => void navigate('/random')}>
+            <IconDice /> Pick something for me
           </button>
           <button className="btn primary" onClick={() => openAdd()}>
-            + Add Application
+            <IconPlus /> Add Application
           </button>
         </div>
       </div>
 
+      {hero && <HeroCard app={hero} />}
+
       {favorites.length > 0 && (
         <section className="section">
           <div className="section-title">
-            <h2>Favorites</h2>
+            <h2>Favourites</h2>
             <Link to="/library?favorites=1">View all</Link>
           </div>
-          <div className="row-scroll">
-            {favorites.map((app) => (
-              <AppCard key={app.id} app={app} />
-            ))}
-          </div>
+          <AppGrid apps={favorites} variant="row" label="Favourites" />
         </section>
       )}
 
-      {recent.length > 0 && (
+      {recent.length > 1 && (
         <section className="section">
           <div className="section-title">
             <h2>Recently launched</h2>
+            <Link to="/library?sort=recent">View all</Link>
           </div>
           <div className="list">
-            {recent.map((app) => (
+            {recent.slice(0, 5).map((app) => (
               <div key={app.id} className="list-row">
                 <Thumb app={app} />
                 <div className="grow">
@@ -89,7 +92,7 @@ export function HomePage(): JSX.Element {
                 </div>
                 <div className="actions">
                   <button className="btn play sm" onClick={() => void launch(app)}>
-                    ▶ Play
+                    <IconPlay /> Play
                   </button>
                 </div>
               </div>
@@ -104,11 +107,7 @@ export function HomePage(): JSX.Element {
             <h2>Most played</h2>
             <Link to="/library?sort=most">View all</Link>
           </div>
-          <div className="row-scroll">
-            {mostPlayed.map((app) => (
-              <AppCard key={app.id} app={app} />
-            ))}
-          </div>
+          <AppGrid apps={mostPlayed} variant="row" label="Most played" />
         </section>
       )}
 
@@ -117,7 +116,7 @@ export function HomePage(): JSX.Element {
           <h2>Library</h2>
           <Link to="/library">View all {apps.length}</Link>
         </div>
-        <AppGrid apps={preview} />
+        <AppGrid apps={preview} label="Library" />
       </section>
     </>
   )
