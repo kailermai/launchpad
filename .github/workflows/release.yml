@@ -67,7 +67,7 @@ jobs:
           Get-Content release/SHA256SUMS.txt
 
       - name: Keep build artefacts with the workflow run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: launchpad-${{ env.VERSION }}
           path: |
