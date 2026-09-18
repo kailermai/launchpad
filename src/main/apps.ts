@@ -59,7 +59,8 @@ export async function updateApplication(store: Store, id: string, raw: unknown):
   if (!prepared.ok) return prepared.result
 
   let iconPath = existing.iconPath
-  const targetChanged = prepared.value.normalized !== existing.launchTarget.toLowerCase() && prepared.value.launchTarget !== existing.launchTarget
+  const previous = validateLaunchTarget(existing.launchType, existing.launchTarget)
+  const targetChanged = !previous.ok || previous.normalized !== prepared.value.normalized
   if (targetChanged) {
     iconPath = prepared.value.launchType === 'uri' ? null : await extractIcon(prepared.value.launchTarget)
   }

@@ -166,8 +166,23 @@ export async function runSmoke(): Promise<void> {
   for (const f of fs.readdirSync(paths.assetsDir)) assert.match(f, /^[0-9a-f-]{36}\.png$/)
   ok('only launcher-generated files exist in assets')
 
+  // Leave behind a small demo library (with icons, a favorite and launch history) so the
+  // data folder can be opened with --data-dir for screenshots and manual poking.
+  const demo = await addApplication(reopened, {
+    name: 'File Explorer',
+    launchType: 'executable',
+    launchTarget: 'C:\\Windows\\explorer.exe',
+    platformId: reopened.findLabelByName('platforms', 'Standalone')?.id ?? null,
+    categoryId: reopened.findLabelByName('categories', 'Utility')?.id ?? null,
+    favorite: true
+  })
+  assert.ok(demo.ok)
+  reopened.markLaunched(demo.application.id)
+  fs.unlinkSync(backupFile)
+
   console.log(results.join('\n'))
   console.log(`\nSMOKE PASSED (${results.length} checks) in ${paths.dataDir}`)
+  console.log(`demo-app-id=${demo.application.id}`)
 }
 
 export function isSmokeRun(): boolean {
