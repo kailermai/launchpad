@@ -1,11 +1,12 @@
-import { app } from 'electron'
+import { app, shell } from 'electron'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import { addApplication, removeApplication, updateApplication } from './apps'
+import { addApplication, refreshIcons, removeApplication, updateApplication } from './apps'
 import { importBackup, loadBackupFile } from './backup'
 import { Store } from './db'
-import { cleanDisplayName, readDroppedFileMetadata } from './files'
+import { cleanDisplayName, extractIcon, readDroppedFileMetadata } from './files'
+import { extractLargestIcon } from './icons'
 import { checkTarget } from './launch'
 import { getPaths, resolveInsideAssets } from './paths'
 import { validateLaunchTarget } from './validate'
@@ -96,6 +97,24 @@ export async function runSmoke(): Promise<void> {
   assert.equal(notepadApp.name, 'Notepad')
   assert.ok(notepadApp.iconPath && fs.existsSync(resolveInsideAssets(notepadApp.iconPath)!))
   ok('add application stores entry and extracts its icon into assets')
+
+  // --- icon extraction reads the file's own resources (larger than the 32px Explorer icon) ---
+  const pngSize = (file: string): number => fs.readFileSync(resolveInsideAssets(file)!).readUInt32BE(16)
+  assert.ok(pngSize(notepadApp.iconPath) >= 48, `expected a large icon, got ${pngSize(notepadApp.iconPath)}px`)
+  const lnkFile = path.join(paths.dataDir, 'np.lnk')
+  assert.ok(shell.writeShortcutLink(lnkFile, { target: notepad })) // test fixture inside our own folder
+  const lnkIcon = await extractIcon(lnkFile)
+  assert.ok(lnkIcon && pngSize(lnkIcon) >= 48)
+  const urlIconFile = path.join(paths.dataDir, 'WithIcon.url')
+  fs.writeFileSync(urlIconFile, `[InternetShortcut]\r\nURL=https://example.com\r\nIconFile=${notepad}\r\nIconIndex=0\r\n`)
+  const urlIcon = await extractIcon(urlIconFile)
+  assert.ok(urlIcon && pngSize(urlIcon) >= 48)
+  const garbage = path.join(paths.dataDir, 'garbage.exe')
+  fs.writeFileSync(garbage, Buffer.from('MZ this is not really a program'))
+  assert.equal(await extractLargestIcon(garbage), null)
+  for (const f of [lnkFile, urlIconFile, garbage]) fs.unlinkSync(f)
+  assert.equal(await refreshIcons(store), 1)
+  ok('largest icon extracted from exe / lnk / url resources; malformed files ignored')
 
   const dup = await addApplication(store, { name: 'Again', launchType: 'executable', launchTarget: notepad.toUpperCase() })
   assert.ok(!dup.ok && dup.reason === 'duplicate' && dup.existing.id === notepadApp.id)

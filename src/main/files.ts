@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { DroppedFileMeta } from '../shared/types'
+import { expandEnv, extractLargestIcon } from './icons'
 import { getPaths, resolveInsideAssets } from './paths'
 import { launchTypeForFile, validateLaunchTarget } from './validate'
 
@@ -68,9 +69,9 @@ export async function readDroppedFileMetadata(filePath: unknown): Promise<Droppe
     }
   } else if (launchType === 'uri') {
     // .url is a tiny INI file: the URL inside becomes the entry, and only if its scheme is allowed.
-    const url = await readInternetShortcut(filePath, stat.size)
-    if (!url || !validateLaunchTarget('uri', url).ok) return null
-    launchTarget = url
+    const link = await readInternetShortcut(filePath, stat.size)
+    if (!link?.url || !validateLaunchTarget('uri', link.url).ok) return null
+    launchTarget = link.url
     iconPath = await extractIcon(filePath)
   }
 
@@ -87,10 +88,17 @@ export async function readDroppedFileMetadata(filePath: unknown): Promise<Droppe
 
 const MAX_URL_FILE_BYTES = 64 * 1024
 
-/** Reads the URL= line from a .url (Internet shortcut) file. Read-only. */
-async function readInternetShortcut(filePath: string, size: number): Promise<string | null> {
+interface InternetShortcut {
+  url: string | null
+  iconFile: string | null
+  iconIndex: number
+}
+
+/** Reads the [InternetShortcut] section of a .url file (URL=, IconFile=, IconIndex=). Read-only. */
+async function readInternetShortcut(filePath: string, size: number): Promise<InternetShortcut | null> {
   if (size > MAX_URL_FILE_BYTES) return null
   const text = await fs.promises.readFile(filePath, 'utf8')
+  const out: InternetShortcut = { url: null, iconFile: null, iconIndex: 0 }
   let inShortcutSection = false
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
@@ -98,9 +106,16 @@ async function readInternetShortcut(filePath: string, size: number): Promise<str
       inShortcutSection = line.toLowerCase() === '[internetshortcut]'
       continue
     }
-    if (inShortcutSection && /^url=/i.test(line)) return line.slice(4).trim() || null
+    if (!inShortcutSection) continue
+    const eq = line.indexOf('=')
+    if (eq < 0) continue
+    const key = line.slice(0, eq).trim().toLowerCase()
+    const value = line.slice(eq + 1).trim()
+    if (key === 'url' && !out.url) out.url = value || null
+    else if (key === 'iconfile') out.iconFile = value || null
+    else if (key === 'iconindex') out.iconIndex = Number.parseInt(value, 10) || 0
   }
-  return null
+  return out
 }
 
 export async function chooseApplicationFile(win: BrowserWindow): Promise<DroppedFileMeta | null> {
@@ -162,19 +177,58 @@ export async function chooseCoverImage(win: BrowserWindow): Promise<string | nul
 
 // ---- icons -------------------------------------------------------------------
 
-/** Asks Windows for the file's icon (read-only) and stores it as a PNG asset. */
+/**
+ * Finds the best icon for a file the user added and stores it as a PNG asset.
+ * Tries the file's own icon resources first (up to 256px); if that yields
+ * nothing, falls back to the small icon Windows shows in Explorer.
+ */
 export async function extractIcon(target: string): Promise<string | null> {
   try {
-    const image = await app.getFileIcon(target, { size: 'large' })
-    if (image.isEmpty()) return null
+    let png = (await largestIconFor(target))?.png ?? null
+    if (!png) {
+      const image = await app.getFileIcon(target, { size: 'large' })
+      if (image.isEmpty()) return null
+      png = image.toPNG()
+    }
     const fileName = `${randomUUID()}.png`
     const dest = resolveInsideAssets(fileName)
     if (!dest) return null
-    await fs.promises.writeFile(dest, image.toPNG(), { flag: 'wx' })
+    await fs.promises.writeFile(dest, png, { flag: 'wx' })
     return fileName
   } catch {
     return null
   }
+}
+
+/** Resolves where a file's icon actually lives (.lnk and .url point elsewhere) and extracts it. */
+async function largestIconFor(target: string): Promise<{ png: Buffer; width: number } | null> {
+  const ext = path.extname(target).toLowerCase()
+  if (ext === '.exe' || ext === '.dll' || ext === '.ico') return extractLargestIcon(target)
+
+  if (ext === '.lnk') {
+    let link: { target: string; icon?: string; iconIndex?: number } | null = null
+    try {
+      link = shell.readShortcutLink(target)
+    } catch {
+      return null
+    }
+    const candidates: [string, number][] = []
+    if (link.icon) candidates.push([expandEnv(link.icon), link.iconIndex ?? 0])
+    if (link.target) candidates.push([expandEnv(link.target), 0])
+    for (const [file, index] of candidates) {
+      const found = await extractLargestIcon(file, index)
+      if (found) return found
+    }
+    return null
+  }
+
+  if (ext === '.url') {
+    const stat = await fs.promises.stat(target)
+    const info = await readInternetShortcut(target, stat.size)
+    if (!info?.iconFile) return null
+    return extractLargestIcon(expandEnv(info.iconFile), info.iconIndex)
+  }
+  return null
 }
 
 // ---- cleanup -----------------------------------------------------------------

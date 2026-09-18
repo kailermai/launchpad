@@ -78,6 +78,32 @@ export async function updateApplication(store: Store, id: string, raw: unknown):
   return { ok: true, application }
 }
 
+/** Re-extracts icons for every file-based entry (used after the icon extractor improves). Returns how many changed. */
+export async function refreshIcons(store: Store): Promise<number> {
+  let updated = 0
+  for (const app of store.listApplications()) {
+    if (app.launchType === 'uri') continue
+    const iconPath = await extractIcon(app.launchTarget)
+    if (!iconPath) continue
+    const v = validateLaunchTarget(app.launchType, app.launchTarget)
+    if (!v.ok) continue
+    store.updateApplication(app.id, {
+      name: app.name,
+      launchType: app.launchType,
+      launchTarget: app.launchTarget,
+      normalized: v.normalized,
+      coverPath: app.coverPath,
+      iconPath,
+      platformId: app.platformId,
+      categoryId: app.categoryId,
+      favorite: app.favorite
+    })
+    await removeOwnedAsset(app.iconPath, referencedElsewhere(store, app.id))
+    updated++
+  }
+  return updated
+}
+
 /** "Remove from Library": deletes the database row and the launcher's own copies of its images. Nothing else. */
 export async function removeApplication(store: Store, id: string): Promise<void> {
   const removed = store.deleteApplication(id)

@@ -422,10 +422,11 @@ textarea {
   text-align: center;
 }
 .cover .fallback img.icon {
-  width: 40px;
-  height: 40px;
+  /* Rendered at natural size so small icons stay crisp; large ones fill the tile. */
+  max-width: 62%;
+  max-height: 50%;
   image-rendering: auto;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.5));
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
 }
 .cover .fallback .initials {
   font-size: 34px;

@@ -17,6 +17,7 @@ const api: LauncherApi = {
   setFavorite: (id, favorite) => invoke(IPC.setFavorite, id, favorite),
   launchApplication: (id) => invoke(IPC.launchApplication, id),
   checkApplicationTarget: (id) => invoke(IPC.checkApplicationTarget, id),
+  refreshIcons: () => invoke(IPC.refreshIcons),
 
   chooseApplicationFile: () => invoke(IPC.chooseApplicationFile),
   readDroppedFileMetadata: (path) => invoke(IPC.readDroppedFileMetadata, path),

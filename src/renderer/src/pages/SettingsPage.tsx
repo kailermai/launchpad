@@ -44,10 +44,25 @@ export function SettingsPage(): JSX.Element {
 // ---- General ----------------------------------------------------------------
 
 function GeneralSettings(): JSX.Element {
+  const { refresh, toast } = useLibrary()
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   useEffect(() => {
     void api.getAppInfo().then(setInfo)
   }, [])
+
+  const refreshIcons = async (): Promise<void> => {
+    setRefreshing(true)
+    try {
+      const n = await api.refreshIcons()
+      await refresh()
+      toast(`Icons refreshed for ${n} ${n === 1 ? 'entry' : 'entries'}.`, 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error')
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <>
@@ -65,6 +80,18 @@ function GeneralSettings(): JSX.Element {
           Open Folder
         </button>
         <div style={{ marginTop: 8, fontSize: 12 }}>This is the only place the launcher ever writes: its database, copies of cover images, and restore snapshots.</div>
+      </div>
+
+      <div className="callout" style={{ marginBottom: 20 }}>
+        <div>
+          <strong>Icons</strong>
+        </div>
+        <div style={{ margin: '6px 0 10px', fontSize: 12 }}>
+          Re-read the icon of every .exe / .lnk / .url entry (picks the largest one the file ships, up to 256px). Read-only.
+        </div>
+        <button className="btn sm" disabled={refreshing} onClick={() => void refreshIcons()}>
+          {refreshing ? 'Refreshing…' : 'Refresh All Icons'}
+        </button>
       </div>
 
       <h2 style={{ fontSize: 16 }}>What this launcher can and cannot do</h2>

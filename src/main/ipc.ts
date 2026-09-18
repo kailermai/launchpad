@@ -1,7 +1,7 @@
 import { app, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { IPC, type IpcChannel } from '../shared/ipc'
 import type { AppInfo } from '../shared/types'
-import { addApplication, removeApplication, updateApplication } from './apps'
+import { addApplication, refreshIcons, removeApplication, updateApplication } from './apps'
 import { importBackup, exportBackup, inspectBackup } from './backup'
 import type { Store } from './db'
 import { chooseApplicationFile, chooseCoverImage, openDataFolder, readDroppedFileMetadata } from './files'
@@ -43,6 +43,7 @@ export function registerIpc(ctx: Context): void {
   handle(IPC.removeApplication, (_e, id) => removeApplication(store, assertId(id)))
   handle(IPC.setFavorite, (_e, id, favorite) => store.setFavorite(assertId(id), Boolean(favorite)))
   handle(IPC.launchApplication, (_e, id) => launchApplication(store, assertId(id)))
+  handle(IPC.refreshIcons, () => refreshIcons(store))
   handle(IPC.checkApplicationTarget, async (_e, id) => {
     const application = store.getApplication(assertId(id))
     if (!application) return { exists: false, message: 'This entry no longer exists.' }

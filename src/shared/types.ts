@@ -123,6 +123,8 @@ export interface LauncherApi {
   setFavorite(id: string, favorite: boolean): Promise<void>
   launchApplication(id: string): Promise<LaunchResult>
   checkApplicationTarget(id: string): Promise<TargetStatus>
+  /** Re-reads icons for all file-based entries. Returns the number updated. */
+  refreshIcons(): Promise<number>
 
   // files the user explicitly picks
   chooseApplicationFile(): Promise<DroppedFileMeta | null>
