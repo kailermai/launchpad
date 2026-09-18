@@ -1,0 +1,175 @@
+import { app, dialog, shell, type BrowserWindow } from 'electron'
+import fs from 'node:fs'
+import path from 'node:path'
+import { randomUUID } from 'node:crypto'
+import type { DroppedFileMeta } from '../shared/types'
+import { getPaths, resolveInsideAssets } from './paths'
+import { launchTypeForFile } from './validate'
+
+/**
+ * Everything here is read-only with respect to the user's files. The only
+ * writes are copies of user-chosen images (and extracted icons) into the
+ * launcher's own assets folder.
+ */
+
+const MAX_COVER_BYTES = 25 * 1024 * 1024
+
+// ---- names -----------------------------------------------------------------
+
+/** Conservative display name from a file stem: "MinecraftLauncher" -> "Minecraft Launcher". */
+export function cleanDisplayName(stem: string): string {
+  let s = stem.replace(/[_]+/g, ' ')
+  s = s.replace(/[-]+/g, ' ')
+  // Split camelCase boundaries only (lower/digit followed by upper).
+  s = s.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  // Drop trailing architecture markers.
+  s = s.replace(/\s+(x64|x86|win64|win32|64bit|32bit)$/i, '')
+  s = s.replace(/\s+/g, ' ').trim()
+  if (s.length === 0) return stem
+  // Title-case only when the whole thing was lowercase, otherwise keep the author's casing.
+  if (s === s.toLowerCase()) {
+    s = s.replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+  return s
+}
+
+// ---- dropped / chosen application files -------------------------------------
+
+/**
+ * Reads metadata from ONE explicitly chosen file. Refuses anything that is not
+ * a regular .exe or .lnk file. Never looks at the containing folder.
+ */
+export async function readDroppedFileMetadata(filePath: unknown): Promise<DroppedFileMeta | null> {
+  if (typeof filePath !== 'string' || filePath.length === 0 || filePath.includes('\0')) return null
+  if (!path.isAbsolute(filePath)) return null
+  const launchType = launchTypeForFile(filePath)
+  if (!launchType) return null
+
+  let stat: fs.Stats
+  try {
+    stat = await fs.promises.stat(filePath)
+  } catch {
+    return null
+  }
+  if (!stat.isFile()) return null
+
+  const fileName = path.basename(filePath)
+  const stem = fileName.slice(0, -path.extname(fileName).length)
+  let shortcutTarget: string | null = null
+  if (launchType === 'shortcut') {
+    try {
+      // Read-only parse of the .lnk; Electron never writes to it.
+      shortcutTarget = shell.readShortcutLink(filePath).target || null
+    } catch {
+      shortcutTarget = null
+    }
+  }
+
+  return {
+    path: filePath,
+    fileName,
+    launchType,
+    suggestedName: cleanDisplayName(stem),
+    shortcutTarget
+  }
+}
+
+export async function chooseApplicationFile(win: BrowserWindow): Promise<DroppedFileMeta | null> {
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choose an application or shortcut',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Applications and shortcuts', extensions: ['exe', 'lnk'] },
+      { name: 'Applications', extensions: ['exe'] },
+      { name: 'Shortcuts', extensions: ['lnk'] }
+    ]
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return readDroppedFileMetadata(result.filePaths[0])
+}
+
+// ---- cover images ------------------------------------------------------------
+
+type ImageKind = 'png' | 'jpg' | 'webp'
+
+async function sniffImage(filePath: string): Promise<ImageKind | null> {
+  const handle = await fs.promises.open(filePath, 'r')
+  try {
+    const buf = Buffer.alloc(12)
+    const { bytesRead } = await handle.read(buf, 0, 12, 0)
+    if (bytesRead < 12) return null
+    if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'png'
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
+    if (buf.subarray(0, 4).toString('ascii') === 'RIFF' && buf.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp'
+    return null
+  } finally {
+    await handle.close()
+  }
+}
+
+/** Copies a user-chosen image into the assets folder. The original is never touched. */
+export async function importCoverFromPath(src: string): Promise<string | null> {
+  const stat = await fs.promises.stat(src)
+  if (!stat.isFile() || stat.size === 0 || stat.size > MAX_COVER_BYTES) return null
+  const kind = await sniffImage(src)
+  if (!kind) return null
+  const fileName = `${randomUUID()}.${kind}`
+  const dest = resolveInsideAssets(fileName)
+  if (!dest) return null
+  await fs.promises.copyFile(src, dest, fs.constants.COPYFILE_EXCL)
+  return fileName
+}
+
+export async function chooseCoverImage(win: BrowserWindow): Promise<string | null> {
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choose a cover image',
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+  })
+  if (result.canceled || result.filePaths.length === 0) return null
+  return importCoverFromPath(result.filePaths[0])
+}
+
+// ---- icons -------------------------------------------------------------------
+
+/** Asks Windows for the file's icon (read-only) and stores it as a PNG asset. */
+export async function extractIcon(target: string): Promise<string | null> {
+  try {
+    const image = await app.getFileIcon(target, { size: 'large' })
+    if (image.isEmpty()) return null
+    const fileName = `${randomUUID()}.png`
+    const dest = resolveInsideAssets(fileName)
+    if (!dest) return null
+    await fs.promises.writeFile(dest, image.toPNG(), { flag: 'wx' })
+    return fileName
+  } catch {
+    return null
+  }
+}
+
+// ---- cleanup -----------------------------------------------------------------
+
+/**
+ * The one delete the launcher performs: an asset file it created itself,
+ * inside its own assets folder, that nothing references any more.
+ */
+export async function removeOwnedAsset(fileName: string | null, stillReferenced: (name: string) => boolean): Promise<void> {
+  if (!fileName) return
+  const resolved = resolveInsideAssets(fileName)
+  if (!resolved) return
+  if (stillReferenced(fileName)) return
+  try {
+    await fs.promises.unlink(resolved)
+  } catch {
+    // Already gone or locked; nothing to do.
+  }
+}
+
+export function assetExists(fileName: string | null): boolean {
+  const resolved = resolveInsideAssets(fileName)
+  return resolved !== null && fs.existsSync(resolved)
+}
+
+export async function openDataFolder(): Promise<void> {
+  await shell.openPath(getPaths().dataDir)
+}
