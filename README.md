@@ -57,6 +57,22 @@ electron . --route="library?theme=plum" --screenshot=shot.png   (theme override;
 electron . --render-icon=build/icon.png
 ```
 
+## Releases
+
+Installer and portable exe are built by GitHub Actions — nothing is built or uploaded from a personal machine.
+
+- **CI** (`.github/workflows/ci.yml`): every push and pull request runs the type-check, the production build and the backend smoke test on a Windows runner.
+- **Release** (`.github/workflows/release.yml`): pushing a tag builds the installer and portable exe, re-runs the smoke test, writes `SHA256SUMS.txt` and publishes a GitHub Release with auto-generated notes.
+
+To cut a release:
+
+```
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The version number comes from the tag. Builds are unsigned (SmartScreen warns on first run); compare your download with `SHA256SUMS.txt` on the release page.
+
 ## Layout
 
 ```

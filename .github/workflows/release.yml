@@ -1,0 +1,88 @@
+# Release pipeline: push a tag like v0.2.0 and this builds the installer + portable exe,
+# re-runs the smoke test against the built bundles, writes SHA-256 checksums and
+# publishes everything as a GitHub Release with auto-generated notes.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Windows release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # needed only to create the release + upload assets
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false' # no code signing; never look for certificates
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (exact lockfile)
+        run: npm ci --no-audit --no-fund
+
+      - name: Set package version from tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "Building version $VERSION from tag $TAG"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Build bundles
+        run: npm run build
+
+      - name: Backend smoke test
+        env:
+          SMOKE_DIR: ${{ runner.temp }}\launchpad-smoke
+        run: npx electron . --smoke
+
+      - name: Package installer + portable exe
+        run: npm run package:ci
+
+      - name: Write SHA-256 checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem release -Filter *.exe
+          $lines = $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name }
+          $lines | Set-Content -Path release/SHA256SUMS.txt -Encoding ascii
+          Get-Content release/SHA256SUMS.txt
+
+      - name: Keep build artefacts with the workflow run
+        uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-${{ env.VERSION }}
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            release/*.exe release/SHA256SUMS.txt \
+            --title "Launchpad ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag \
+            --notes "Windows builds are unsigned, so SmartScreen shows a warning on first run (More info → Run anyway). Verify downloads against SHA256SUMS.txt."
