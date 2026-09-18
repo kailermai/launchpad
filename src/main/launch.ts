@@ -2,7 +2,7 @@ import { shell } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Application, LaunchResult, TargetStatus } from '../shared/types'
+import type { Application, LaunchResult, MissingTarget, TargetStatus } from '../shared/types'
 import type { Store } from './db'
 import { validateLaunchTarget } from './validate'
 
@@ -52,6 +52,18 @@ export async function checkTarget(app: Application): Promise<TargetStatus> {
     }
   }
   return { exists: true }
+}
+
+/** Checks every entry (read-only) and lists the ones whose target no longer exists. */
+export async function checkAllTargets(store: Store): Promise<MissingTarget[]> {
+  const missing: MissingTarget[] = []
+  for (const app of store.listApplications()) {
+    const status = await checkTarget(app)
+    if (!status.exists) {
+      missing.push({ id: app.id, name: app.name, launchTarget: app.launchTarget, message: status.message ?? 'Launch target could not be found.' })
+    }
+  }
+  return missing
 }
 
 function spawnDetached(exePath: string): Promise<void> {

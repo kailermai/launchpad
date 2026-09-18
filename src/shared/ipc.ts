@@ -8,6 +8,7 @@ export const IPC = {
   launchApplication: 'apps:launch',
   checkApplicationTarget: 'apps:checkTarget',
   refreshIcons: 'apps:refreshIcons',
+  checkAllTargets: 'apps:checkAllTargets',
 
   chooseApplicationFile: 'files:chooseApplication',
   readDroppedFileMetadata: 'files:droppedMetadata',

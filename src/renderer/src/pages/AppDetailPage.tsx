@@ -80,6 +80,8 @@ export function AppDetailPage(): JSX.Element {
         <dl className="facts">
           <dt>Last launched</dt>
           <dd>{relativeTime(app.lastLaunchedAt)}</dd>
+          <dt>Launched</dt>
+          <dd>{app.launchCount === 0 ? 'Never from here' : `${app.launchCount} ${app.launchCount === 1 ? 'time' : 'times'} from here`}</dd>
           <dt>Launch target</dt>
           <dd className="mono">{app.launchTarget}</dd>
           <dt>Added</dt>

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
-import type { AppInfo, BackupSummary, Platform, RestoreMode } from '@shared/types'
+import type { AppInfo, BackupSummary, MissingTarget, Platform, RestoreMode } from '@shared/types'
 import { api } from '@/api'
 import { ConfirmModal } from '@/components/Modal'
 import { useLibrary } from '@/store/LibraryContext'
+import { useNavigate } from 'react-router-dom'
 
 export function SettingsPage(): JSX.Element {
   return (
@@ -27,6 +28,9 @@ export function SettingsPage(): JSX.Element {
           <NavLink to="/settings/backup" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Backup &amp; Restore
           </NavLink>
+          <NavLink to="/settings/health" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Library Health
+          </NavLink>
         </nav>
         <div className="settings-panel">
           <Routes>
@@ -34,6 +38,7 @@ export function SettingsPage(): JSX.Element {
             <Route path="platforms" element={<LabelManager kind="platforms" />} />
             <Route path="categories" element={<LabelManager kind="categories" />} />
             <Route path="backup" element={<BackupSettings />} />
+            <Route path="health" element={<HealthSettings />} />
           </Routes>
         </div>
       </div>
@@ -257,6 +262,108 @@ function LabelManager({ kind }: { kind: 'platforms' | 'categories' }): JSX.Eleme
           <p>
             {usage(removing.id)} {usage(removing.id) === 1 ? 'application uses' : 'applications use'} this {singular}. They will stay in your
             library without a {singular}.
+          </p>
+        </ConfirmModal>
+      )}
+    </>
+  )
+}
+
+// ---- Library Health ---------------------------------------------------------------
+
+function HealthSettings(): JSX.Element {
+  const { apps, refresh, toast, setModal } = useLibrary()
+  const navigate = useNavigate()
+  const [missing, setMissing] = useState<MissingTarget[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [removing, setRemoving] = useState<MissingTarget | null>(null)
+
+  const check = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      setMissing(await api.checkAllTargets())
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fileEntries = apps.filter((a) => a.launchType !== 'uri').length
+
+  return (
+    <>
+      <h2>Library Health</h2>
+      <p className="lead">
+        Checks whether each entry's file still exists — for example games you have since uninstalled. This only looks; it never searches
+        your PC for moved files or changes anything.
+      </p>
+
+      <button className="btn primary" disabled={busy || fileEntries === 0} onClick={() => void check()}>
+        {busy ? 'Checking…' : `Check All Targets (${fileEntries})`}
+      </button>
+
+      {missing && missing.length === 0 && (
+        <div className="callout" style={{ marginTop: 16 }}>
+          <strong>All good.</strong> Every entry still points at an existing file.
+        </div>
+      )}
+
+      {missing && missing.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div className="callout warn" style={{ marginBottom: 12 }}>
+            <strong>
+              {missing.length} {missing.length === 1 ? 'entry' : 'entries'} can't be found.
+            </strong>{' '}
+            Choose a new location yourself, or remove the launcher entry (the app's own files are never touched).
+          </div>
+          <div className="list">
+            {missing.map((m) => {
+              const app = apps.find((a) => a.id === m.id)
+              return (
+                <div key={m.id} className="list-row">
+                  <div className="grow">
+                    <div className="title">{m.name}</div>
+                    <div className="detail mono selectable">{m.launchTarget}</div>
+                  </div>
+                  <div className="actions">
+                    <button className="btn sm" onClick={() => navigate(`/library/${m.id}`)}>
+                      Open
+                    </button>
+                    {app && (
+                      <button className="btn sm" onClick={() => setModal({ type: 'missing', app, message: m.message })}>
+                        Choose New Target…
+                      </button>
+                    )}
+                    <button className="btn sm danger" onClick={() => setRemoving(m)}>
+                      Remove from Library
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {removing && (
+        <ConfirmModal
+          title={`Remove ${removing.name} from your launcher?`}
+          confirmLabel="Remove from Library"
+          danger
+          onCancel={() => setRemoving(null)}
+          onConfirm={() => {
+            void (async () => {
+              await api.removeApplication(removing.id)
+              await refresh()
+              setMissing((list) => (list ? list.filter((m) => m.id !== removing.id) : list))
+              setRemoving(null)
+              toast(`${removing.name} removed from your library.`)
+            })()
+          }}
+        >
+          <p>
+            This only removes the launcher entry. <strong>Nothing on disk is modified.</strong>
           </p>
         </ConfirmModal>
       )}

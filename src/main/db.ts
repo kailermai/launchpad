@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS applications (
   favorite                 INTEGER NOT NULL DEFAULT 0,
   created_at               TEXT NOT NULL,
   updated_at               TEXT NOT NULL,
-  last_launched_at         TEXT
+  last_launched_at         TEXT,
+  launch_count             INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS picker_presets (
   id         TEXT PRIMARY KEY,
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS picker_preset_items (
 );
 `
 
+const SCHEMA_VERSION = 2
 const DEFAULT_PLATFORMS = ['Steam', 'Epic', 'Riot', 'Xbox', 'Standalone', 'Other']
 const DEFAULT_CATEGORIES = ['Game', 'Development', 'University', 'Utility', 'Media', 'Other']
 
@@ -69,6 +71,7 @@ interface ApplicationRow {
   created_at: string
   updated_at: string
   last_launched_at: string | null
+  launch_count: number
 }
 
 interface LabelRow {
@@ -92,6 +95,7 @@ export interface NewApplication {
   createdAt?: string
   updatedAt?: string
   lastLaunchedAt?: string | null
+  launchCount?: number
 }
 
 const now = (): string => new Date().toISOString()
@@ -109,7 +113,8 @@ function rowToApplication(r: ApplicationRow): Application {
     favorite: r.favorite === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
-    lastLaunchedAt: r.last_launched_at
+    lastLaunchedAt: r.last_launched_at,
+    launchCount: r.launch_count ?? 0
   }
 }
 
@@ -147,8 +152,9 @@ export class Store {
 
   private migrate(): void {
     this.db.exec(SCHEMA)
-    const version = this.get<{ value: string }>(`SELECT value FROM meta WHERE key = 'schema_version'`)
-    if (!version) {
+    const version = Number(this.get<{ value: string }>(`SELECT value FROM meta WHERE key = 'schema_version'`)?.value ?? 0)
+    if (version === 0) {
+      // Fresh database: seed defaults. SCHEMA above is already the current shape.
       this.transaction(() => {
         DEFAULT_PLATFORMS.forEach((name, i) =>
           this.run('INSERT INTO platforms (id, name, sort_order) VALUES (?, ?, ?)', [randomUUID(), name, i])
@@ -156,9 +162,26 @@ export class Store {
         DEFAULT_CATEGORIES.forEach((name, i) =>
           this.run('INSERT INTO categories (id, name, sort_order) VALUES (?, ?, ?)', [randomUUID(), name, i])
         )
-        this.run(`INSERT INTO meta (key, value) VALUES ('schema_version', '1')`)
+        this.run(`INSERT INTO meta (key, value) VALUES ('schema_version', ?)`, [String(SCHEMA_VERSION)])
+      })
+      return
+    }
+    if (version < 2) {
+      this.transaction(() => {
+        if (!this.hasColumn('applications', 'launch_count')) {
+          this.run('ALTER TABLE applications ADD COLUMN launch_count INTEGER NOT NULL DEFAULT 0')
+        }
+        this.run(`UPDATE meta SET value = '2' WHERE key = 'schema_version'`)
       })
     }
+  }
+
+  private hasColumn(table: string, column: string): boolean {
+    return this.all<{ name: string }>(`PRAGMA table_info(${table})`).some((c) => c.name === column)
+  }
+
+  schemaVersion(): number {
+    return Number(this.get<{ value: string }>(`SELECT value FROM meta WHERE key = 'schema_version'`)?.value ?? 0)
   }
 
   // ---- low level -----------------------------------------------------------
@@ -224,8 +247,8 @@ export class Store {
       this.run(
         `INSERT INTO applications
           (id, name, launch_type, launch_target, launch_target_normalized, cover_path, icon_path,
-           platform_id, category_id, favorite, created_at, updated_at, last_launched_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           platform_id, category_id, favorite, created_at, updated_at, last_launched_at, launch_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           input.name,
@@ -239,7 +262,8 @@ export class Store {
           input.favorite ? 1 : 0,
           input.createdAt ?? ts,
           input.updatedAt ?? ts,
-          input.lastLaunchedAt ?? null
+          input.lastLaunchedAt ?? null,
+          Math.max(0, Math.floor(input.launchCount ?? 0))
         ]
       )
     })
@@ -286,7 +310,9 @@ export class Store {
   }
 
   markLaunched(id: string): void {
-    this.transaction(() => this.run('UPDATE applications SET last_launched_at = ? WHERE id = ?', [now(), id]))
+    this.transaction(() =>
+      this.run('UPDATE applications SET last_launched_at = ?, launch_count = launch_count + 1 WHERE id = ?', [now(), id])
+    )
   }
 
   private existingId(table: LabelTable, id: string | null): string | null {

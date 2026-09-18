@@ -1,8 +1,31 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import type { Application, SortMode } from '@shared/types'
 import { AppGrid } from '@/components/AppCard'
 import { EmptyState } from '@/components/EmptyState'
 import { useLibrary } from '@/store/LibraryContext'
+
+const SORT_LABELS: Record<SortMode, string> = {
+  name: 'Name',
+  recent: 'Recently launched',
+  most: 'Most launched',
+  added: 'Recently added'
+}
+
+export function sortApps(apps: Application[], mode: SortMode): Application[] {
+  const byName = (a: Application, b: Application): number => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  const sorted = [...apps]
+  switch (mode) {
+    case 'recent':
+      return sorted.sort((a, b) => (b.lastLaunchedAt ?? '').localeCompare(a.lastLaunchedAt ?? '') || byName(a, b))
+    case 'most':
+      return sorted.sort((a, b) => b.launchCount - a.launchCount || byName(a, b))
+    case 'added':
+      return sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || byName(a, b))
+    default:
+      return sorted.sort(byName)
+  }
+}
 
 export function LibraryPage(): JSX.Element {
   const { apps, platforms, categories, loaded, platformName, categoryName } = useLibrary()
@@ -12,6 +35,8 @@ export function LibraryPage(): JSX.Element {
   const platform = params.get('platform') ?? ''
   const category = params.get('category') ?? ''
   const favoritesOnly = params.get('favorites') === '1'
+  const sortParam = params.get('sort')
+  const sort: SortMode = sortParam && sortParam in SORT_LABELS ? (sortParam as SortMode) : 'name'
 
   const update = (key: string, value: string | null): void => {
     const next = new URLSearchParams(params)
@@ -21,7 +46,7 @@ export function LibraryPage(): JSX.Element {
   }
 
   const filtered = useMemo(() => {
-    return apps.filter((a) => {
+    const list = apps.filter((a) => {
       if (platform && a.platformId !== platform) return false
       if (category && a.categoryId !== category) return false
       if (favoritesOnly && !a.favorite) return false
@@ -31,7 +56,8 @@ export function LibraryPage(): JSX.Element {
       }
       return true
     })
-  }, [apps, platform, category, favoritesOnly, q, platformName, categoryName])
+    return sortApps(list, sort)
+  }, [apps, platform, category, favoritesOnly, q, sort, platformName, categoryName])
 
   if (!loaded) return <div />
 
@@ -67,6 +93,13 @@ export function LibraryPage(): JSX.Element {
         <button className={`chip ${favoritesOnly ? 'active' : ''}`} onClick={() => update('favorites', favoritesOnly ? null : '1')}>
           ★ Favorites only
         </button>
+        <select className="input" value={sort} onChange={(e) => update('sort', e.target.value === 'name' ? null : e.target.value)} aria-label="Sort">
+          {(Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+            <option key={m} value={m}>
+              Sort: {SORT_LABELS[m]}
+            </option>
+          ))}
+        </select>
         {anyFilter && (
           <button className="btn ghost sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
             Clear

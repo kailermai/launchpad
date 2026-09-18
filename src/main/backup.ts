@@ -204,7 +204,8 @@ export async function importBackup(store: Store, token: unknown, mode: unknown):
         favorite: Boolean(item.favorite),
         createdAt: isoOrNow(item.createdAt),
         updatedAt: isoOrNow(item.updatedAt),
-        lastLaunchedAt: typeof item.lastLaunchedAt === 'string' ? isoOrNow(item.lastLaunchedAt) : null
+        lastLaunchedAt: typeof item.lastLaunchedAt === 'string' ? isoOrNow(item.lastLaunchedAt) : null,
+        launchCount: typeof item.launchCount === 'number' && Number.isFinite(item.launchCount) ? item.launchCount : 0
       })
       if (oldId) appMap.set(oldId, created.id)
       imported.applications++

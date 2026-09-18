@@ -16,6 +16,10 @@ export function HomePage(): JSX.Element {
     .filter((a) => a.lastLaunchedAt)
     .sort((a, b) => (b.lastLaunchedAt ?? '').localeCompare(a.lastLaunchedAt ?? ''))
     .slice(0, 6)
+  const mostPlayed = apps
+    .filter((a) => a.launchCount > 0)
+    .sort((a, b) => b.launchCount - a.launchCount || a.name.localeCompare(b.name))
+    .slice(0, 6)
   const preview = apps.slice(0, 12)
 
   if (apps.length === 0) {
@@ -89,6 +93,20 @@ export function HomePage(): JSX.Element {
                   </button>
                 </div>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {mostPlayed.length > 1 && (
+        <section className="section">
+          <div className="section-title">
+            <h2>Most played</h2>
+            <Link to="/library?sort=most">View all</Link>
+          </div>
+          <div className="row-scroll">
+            {mostPlayed.map((app) => (
+              <AppCard key={app.id} app={app} />
             ))}
           </div>
         </section>

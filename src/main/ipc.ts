@@ -5,7 +5,7 @@ import { addApplication, refreshIcons, removeApplication, updateApplication } fr
 import { importBackup, exportBackup, inspectBackup } from './backup'
 import type { Store } from './db'
 import { chooseApplicationFile, chooseCoverImage, openDataFolder, readDroppedFileMetadata } from './files'
-import { checkTarget, launchApplication } from './launch'
+import { checkAllTargets, checkTarget, launchApplication } from './launch'
 import { getPaths } from './paths'
 import { assertId, assertIdList, validateLabel } from './validate'
 
@@ -44,6 +44,7 @@ export function registerIpc(ctx: Context): void {
   handle(IPC.setFavorite, (_e, id, favorite) => store.setFavorite(assertId(id), Boolean(favorite)))
   handle(IPC.launchApplication, (_e, id) => launchApplication(store, assertId(id)))
   handle(IPC.refreshIcons, () => refreshIcons(store))
+  handle(IPC.checkAllTargets, () => checkAllTargets(store))
   handle(IPC.checkApplicationTarget, async (_e, id) => {
     const application = store.getApplication(assertId(id))
     if (!application) return { exists: false, message: 'This entry no longer exists.' }

@@ -18,6 +18,7 @@ const api: LauncherApi = {
   launchApplication: (id) => invoke(IPC.launchApplication, id),
   checkApplicationTarget: (id) => invoke(IPC.checkApplicationTarget, id),
   refreshIcons: () => invoke(IPC.refreshIcons),
+  checkAllTargets: () => invoke(IPC.checkAllTargets),
 
   chooseApplicationFile: () => invoke(IPC.chooseApplicationFile),
   readDroppedFileMetadata: (path) => invoke(IPC.readDroppedFileMetadata, path),

@@ -7,7 +7,7 @@ import { importBackup, loadBackupFile } from './backup'
 import { Store } from './db'
 import { cleanDisplayName, extractIcon, readDroppedFileMetadata } from './files'
 import { extractLargestIcon } from './icons'
-import { checkTarget } from './launch'
+import { checkAllTargets, checkTarget } from './launch'
 import { getPaths, resolveInsideAssets } from './paths'
 import { validateLaunchTarget } from './validate'
 
@@ -152,12 +152,35 @@ export async function runSmoke(): Promise<void> {
   assert.ok(edited.ok && edited.application.coverPath === null && edited.application.name === 'Notepad (renamed)')
   ok('edit ignores cover paths that are not launcher assets')
 
+  // --- launch count + missing-target audit ---
+  store.markLaunched(notepadApp.id)
+  store.markLaunched(notepadApp.id)
+  assert.equal(store.getApplication(notepadApp.id)!.launchCount, 2)
+  const gone = await addApplication(store, { name: 'Gone Again', launchType: 'executable', launchTarget: 'C:\\definitely\\not\\here2.exe' })
+  assert.ok(gone.ok)
+  const audit = await checkAllTargets(store)
+  assert.deepEqual(audit.map((m) => m.id), [gone.application.id])
+  await removeApplication(store, gone.application.id)
+  ok('launch count increments; audit lists only missing targets')
+
   // --- persistence: reopen from disk ---
   const reopened = await Store.open(paths.dbFile)
   assert.equal(reopened.listApplications().length, 1)
   assert.equal(reopened.listPresets().length, 1)
   assert.ok(!fs.existsSync(`${paths.dbFile}.tmp`))
   ok('database persisted atomically and reopens')
+
+  // --- schema migration from v1 (no launch_count column) ---
+  reopened.transaction(() => {
+    reopened.run('ALTER TABLE applications DROP COLUMN launch_count')
+    reopened.run(`UPDATE meta SET value = '1' WHERE key = 'schema_version'`)
+  })
+  const migrated = await Store.open(paths.dbFile)
+  assert.equal(migrated.schemaVersion(), 2)
+  assert.equal(migrated.getApplication(notepadApp.id)!.launchCount, 0)
+  migrated.markLaunched(notepadApp.id)
+  assert.equal(migrated.getApplication(notepadApp.id)!.launchCount, 1)
+  ok('v1 database migrates to v2 in place')
 
   // --- backup import treats the file as untrusted ---
   const backupFile = path.join(paths.dataDir, 'test-backup.json')
@@ -179,20 +202,20 @@ export async function runSmoke(): Promise<void> {
   )
   const summary = await loadBackupFile(backupFile)
   assert.equal(summary.applications, 5)
-  const restored = await importBackup(reopened, summary.token, 'merge')
+  const restored = await importBackup(migrated, summary.token, 'merge')
   assert.equal(restored.imported.applications, 2) // calc + cmd; bat, follina rejected; notepad already present
   assert.equal(restored.imported.platforms, 1) // Epic existed, Custom Box new
   assert.equal(restored.skipped, 3)
-  const cmdApp = reopened.listApplications().find((a) => a.name === 'Traversal')!
+  const cmdApp = migrated.listApplications().find((a) => a.name === 'Traversal')!
   assert.equal(cmdApp.coverPath, null)
-  const imported = reopened.listPresets().find((p) => p.name === 'Imported')!
+  const imported = migrated.listPresets().find((p) => p.name === 'Imported')!
   assert.equal(imported.applicationIds.length, 3) // a1, a4 (mapped to notepad), a5
   ok('backup import validates every entry and remaps ids')
 
   const summary2 = await loadBackupFile(backupFile)
-  await importBackup(reopened, summary2.token, 'replace')
+  await importBackup(migrated, summary2.token, 'replace')
   assert.equal(fs.readdirSync(paths.snapshotsDir).length, 1)
-  assert.equal(reopened.listApplications().length, 3)
+  assert.equal(migrated.listApplications().length, 3)
   ok('replace restore snapshots the database first')
 
   // --- nothing escaped the data folder ---
@@ -201,23 +224,23 @@ export async function runSmoke(): Promise<void> {
 
   // Leave behind a small demo library (with icons, a favorite and launch history) so the
   // data folder can be opened with --data-dir for screenshots and manual poking.
-  const demo = await addApplication(reopened, {
+  const demo = await addApplication(migrated, {
     name: 'File Explorer',
     launchType: 'executable',
     launchTarget: 'C:\\Windows\\explorer.exe',
-    platformId: reopened.findLabelByName('platforms', 'Standalone')?.id ?? null,
-    categoryId: reopened.findLabelByName('categories', 'Utility')?.id ?? null,
+    platformId: migrated.findLabelByName('platforms', 'Standalone')?.id ?? null,
+    categoryId: migrated.findLabelByName('categories', 'Utility')?.id ?? null,
     favorite: true
   })
   assert.ok(demo.ok)
-  reopened.markLaunched(demo.application.id)
-  const steamDemo = await addApplication(reopened, {
+  migrated.markLaunched(demo.application.id)
+  const steamDemo = await addApplication(migrated, {
     name: 'Hades',
     launchType: 'uri',
     launchTarget: 'steam://rungameid/1145360',
     iconPath: urlMeta.iconPath,
-    platformId: reopened.findLabelByName('platforms', 'Epic')?.id ?? null,
-    categoryId: reopened.findLabelByName('categories', 'Game')?.id ?? null
+    platformId: migrated.findLabelByName('platforms', 'Epic')?.id ?? null,
+    categoryId: migrated.findLabelByName('categories', 'Game')?.id ?? null
   })
   assert.ok(steamDemo.ok && steamDemo.application.launchType === 'uri')
   fs.unlinkSync(urlFile)

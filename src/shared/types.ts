@@ -18,6 +18,17 @@ export interface Application {
   createdAt: string
   updatedAt: string
   lastLaunchedAt: string | null
+  /** Launches started from this launcher. */
+  launchCount: number
+}
+
+export type SortMode = 'name' | 'recent' | 'most' | 'added'
+
+export interface MissingTarget {
+  id: string
+  name: string
+  launchTarget: string
+  message: string
 }
 
 export interface ApplicationInput {
@@ -125,6 +136,8 @@ export interface LauncherApi {
   checkApplicationTarget(id: string): Promise<TargetStatus>
   /** Re-reads icons for all file-based entries. Returns the number updated. */
   refreshIcons(): Promise<number>
+  /** Read-only check of every entry's launch target; returns the ones that are missing. */
+  checkAllTargets(): Promise<MissingTarget[]>
 
   // files the user explicitly picks
   chooseApplicationFile(): Promise<DroppedFileMeta | null>
