@@ -17,7 +17,7 @@
     "package:ci": "electron-builder --win --config electron-builder.yml --publish never"
   },
   "dependencies": {
-    "sql.js": "^1.13.0"
+    "sql.js": "^1.15.2"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
